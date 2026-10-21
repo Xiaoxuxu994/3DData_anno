@@ -39,3 +39,5 @@
 | `outputs/qc/` | v0 质检信号与校准 |
 | `outputs/viz/` | 演示视频与 PLY |
 | `outputs/pipeline_test/` | `pipeline/` 入口和回归测试的输出 |
+
+**回归测试依赖**：`tests/regression_A.py`、`tests/compare_C.py` 读取 `outputs/evolution/`（E3、E3b、E8、E9 的逐段结果 CSV）和 `outputs/bench/eval3d_A/`（GT 与 ViPE 结果）作为参考值；换机器时这两个目录要一起拷贝。
