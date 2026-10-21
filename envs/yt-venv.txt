@@ -1,0 +1,15 @@
+# frozen from cache/yt-venv (Python 3.12.15) on 2026-10-21
+brotli==1.2.0
+certifi==2026.7.22
+charset_normalizer==3.5.2
+deno==2.4.5
+idna==3.20
+mutagen==1.48.1
+numpy==2.5.4
+opencv_python_headless==5.0.0.93
+pycryptodomex==3.24.1
+requests==2.34.2
+urllib3==2.8.0
+websockets==17.2
+yt_dlp==2026.8.19
+yt_dlp_ejs==0.8.0

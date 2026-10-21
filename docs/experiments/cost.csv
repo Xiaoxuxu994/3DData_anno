@@ -1,0 +1,31 @@
+stage,component,unit,gpu_sec_per_clip,cpu_sec_per_clip,peak_vram_gb,clip_spec,source,notes
+filter,TransNetV2 cut + ffmpeg,clip,,1.7,,12s@15fps,code/filter/README.md,measured on 1835-clip pool
+filter,luma/blur rules,clip,,0.19,,12s@15fps,code/filter/README.md,
+filter,OCR text overlay (PaddleOCR),clip,,1.0,,12s@15fps,code/filter/README.md,CPU
+filter,RAFT flow (static/dynamic),clip,2.0,,,12s@15fps,code/filter/README.md,
+filter,GeoCalib 12 frames (zoom/fisheye),clip,1.0,,,12s@15fps,code/filter/README.md,
+filter,Qwen3-VL-32B 12 frames,clip,0.57,,63,12 frames,outputs/filter/report/big_compare.json,~6300 clips per GPU-hour (vLLM)
+filter,Qwen3.5-122B-A10B-FP8,clip,0.46,,116,12 frames,big_compare.json,TP2 ~7750 clips/GPU-h
+filter,Qwen3-VL-235B-A22B-FP8,clip,1.09,,224,12 frames,big_compare.json,TP4 ~3300 clips/GPU-h
+annotate,ViPE default,clip,69,,,200f 640x480,outputs/bench/eval3d_A/vipe/logs/status.jsonl,median of 59 clips; wall time incl. CPU parts
+annotate,ViPE default,clip,110,,,180f 1920x1080,outputs/bench/wild/vipe/logs/status.jsonl,median of 72 clips
+annotate,Pi3X image-only,clip,18.6,,82,200f -> 574x434,outputs/bench/eval3d_A/pi3x/status.jsonl,model time only; + ~15 s image load/resize on CPU
+annotate,Pi3X image-only,clip,16.4,,73,180f -> 672x378,outputs/bench/wild/pi3x/status.jsonl,
+annotate,DA3 nested giant,clip,4.2,,31,200f -> 504x378,outputs/bench/eval3d_A/da3/status.jsonl,
+annotate,DA3 nested giant,clip,8.8,,24,180f -> 504x280,outputs/bench/wild/da3/status.jsonl,
+annotate,VGGT-Omega 416,clip,7.7,,17,200f,outputs/bench/eval3d_A/vggt_omega/status.jsonl,
+annotate,VGGT-Omega 416,clip,10.4,,17,180f,outputs/bench/wild/vggt_omega/status.jsonl,
+annotate,ViPE per-clip CLI (controlled),clip,76.7,,,6xA 200f + 6xC 180f,E6/cli,median 75.9 (A) / 80.0 (C)
+annotate,ViPE persistent worker,clip,59.3,,,same 12 clips,E6/worker_full,
+annotate,ViPE persistent worker half frame rate,clip,38.2,,,same 12 clips (100/90 f),E6/worker_sub2,
+annotate,ViPE 2 workers per GPU,clip,43.8,,,same 12 clips,E6/conc2,wall 526 s / 12 clips
+annotate,Pi3X K-conditioned,clip,19.3,20,85,200f -> 574x434,E1/logs/pi3x_kvipe_g1.log,CPU = image load/resize (can overlap)
+annotate,DA3 pose+K conditioned,clip,16,,31,200f,E1/logs/da3_pkvipe_g4.log,only needed for QC partners
+annotate,GeoCalib 12 frames,clip,1.1,,,any,E1/logs/geocalib.log,only when the K gate fires
+annotate,MapAnything Apache (K-conditioned),clip,12.5,,101,200f -> ~255k px,E10/ma_kgate_*.log,rejected annotator
+qc,E13 gate-2 cache (RAFT fw/bw g1/5 + SuperPoint/LightGlue g5/20 @512px),clip,1.4,0.5,,ScanNet++ 200f,E13/logs/cache_S.log,not adopted (E13); 0.58 RAFT + 0.81 LightGlue
+qc,E13 gate-2 self-check signals (Sampson / induced flow / cons / fsv),label,,7.1,,180-200f @512px,E13/raw/gate2_composites.csv,not adopted (E13); median CPU-s single process
+qc,E13 focal sweep (Pi3X K-conditioned x11 focal scales),clip,207,,139,180f -> ~255k px,E13/logs/fsweep_pi3x.log,diagnostic only; 3-point version ~57 GPU-s
+annotate,MoGe-2 ViT-L normal (single image; free or fov_x),clip,4.2,,18.8,180f -> ~250k px,E12/raw/cost_per_clip.csv,not adopted (E12); batch 16 fp16 res_level 9; 23 ms/frame
+annotate,MoGe-3 ViT-L (single image; refine_steps 3),clip,11.0,,19.2,180f -> ~250k px,E12/raw/cost_per_clip.csv,not adopted (E12); 61 ms/frame; +~15 s FlexGEMM autotune per process
+annotate,MoGe-3 ViT-g (single image; refine_steps 3),clip,17.3,,39.4,180f -> ~250k px,E12/raw/cost_per_clip.csv,not adopted (E12); 96 ms/frame; candidate depth for licence-clean line

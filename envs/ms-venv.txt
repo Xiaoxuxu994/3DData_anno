@@ -1,0 +1,15 @@
+# frozen from cache/ms-venv (Python 3.12.15) on 2026-10-21
+certifi==2026.7.22
+cffi==2.1.1
+charset_normalizer==3.5.2
+cryptography==50.0.2
+filelock==4.2.0
+idna==3.20
+modelscope==1.40.2
+modelscope_hub==0.4.6
+packaging==26.3
+pycparser==3.11
+requests==2.34.2
+setuptools==84.0.0
+tqdm==4.70.1
+urllib3==2.8.0

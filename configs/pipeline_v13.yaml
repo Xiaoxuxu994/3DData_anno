@@ -1,0 +1,40 @@
+# Current best 3D pseudo-label pipeline (line I evolution). Bump version on every adopted change; see LOG.md.
+version: v1.3
+date: 2026-10-18
+changes_from_v0: [E8 cheap QC v1c, E2 shot splitting, E3b geometric-mean scale, E1a K gate, E1b/E1c K-conditioned Pi3X as main annotator with ViPE depth scale, E1d QC rule v1b]
+filter:
+  rules: [transnetv2_cut>0.5, static_camera(raft), too_dynamic(raft), text_overlay(ocr), fisheye/zoom(geocalib), dark, blur, overexposed]
+  vlm: Qwen3-VL-32B (12 frames, vLLM, single GPU)
+  combine: reject if any stage rejects
+  cut_handling: split at TransNetV2 boundaries (+-3 frame guard), keep shots >= 6 s, re-run all stages per shot   # E2 (+15% frames)
+annotate:
+  intrinsics: ViPE K unless ViPE HFOV outside [25,130] deg -> median HFOV of (GeoCalib, Pi3X image-only, DA3)   # E1a gate
+  pose_depth: Pi3X forward(intrinsics=gated K)  (own poses + own depth, one forward pass)                      # E1b
+  metric_scale: k = sqrt(k_depth * k_traj); k_depth = median(ViPE depth)/median(Pi3X depth), k_traj = Sim3 scale Pi3X->ViPE camera centres   # E1c, E3b
+  runtime: ViPE as persistent workers, 2 per H200 (E6b); every 2nd frame for indoor/slow categories (E6a, E6c)
+  still_required: ViPE (default profile) for K + metric scale; DA3 on ViPE cameras (QC partner); GeoCalib + image-only DA3/Pi3X for the K gate / disagreement
+qc:
+  rule_v1c: max(traj_vs_ViPE/3.27%, depth_vs_DA3(ViPE cams)/0.194, K_disagreement/13.2deg) > 1 -> reject   # E8 (A+B AUROC 0.78; C rejects 54%)
+  flags: [K gate fired, view_jump>60deg (E9), hfov_outside_30_120 (E9), static_camera->focal_unobservable, rot_jump>20deg->suspect_cut, focal_change>7%->suspect_zoom]
+# NOTE: block below is v1 (depth-ratio scale); v1.3 numbers are in reference_metrics_A_v13
+reference_metrics_A:   # 51 clips, no ETH3D (E3/tables.md, pi3x_kgate@vipe_d)
+  ate_sim3_pct: 0.652
+  fail_ate_se3: 0.0
+  fail_scale: 0.321
+  depth_metric_absrel: 0.0624
+  pc_fscore_5cm: 0.813
+  pc_traj_fscore_5cm: 0.670
+  g5_epe_med_px: 4.06
+  g20_epe_med_px: 7.03
+reference_metrics_A_v13:   # 51 clips, no ETH3D (E3b/tables.md, pi3x_kgate@vipe_td = geometric-mean scale, the adopted v1.3 setting)
+  ate_sim3_pct: 0.652
+  fail_ate_se3: 0.0714
+  fail_scale: 0.25
+  fail_depth: 0.107
+  depth_metric_absrel: 0.0688
+  pc_fscore_5cm: 0.813
+  pc_traj_fscore_5cm: 0.670
+  g5_epe_med_px: 4.06
+  g20_epe_med_px: 7.03
+reference_metrics_C: {g5_selfcons: 0.889, g20_selfcons: 0.792, photo_err: 11.5}
+open_issues: [metric scale (A 32% fail), ScanNet++ scale 3.6->14.3% vs v0, QC thresholds in-sample]

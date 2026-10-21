@@ -1,0 +1,75 @@
+[
+ {
+  "cat": "indoor_static",
+  "id": "W7c6OGrUM-4",
+  "start": 30,
+  "len": 12,
+  "keep": 8
+ },
+ {
+  "cat": "indoor_static",
+  "id": "BjVA_LbOJMI",
+  "start": 600,
+  "len": 12
+ },
+ {
+  "cat": "indoor_dynamic",
+  "id": "zh_BV_lPLOk",
+  "start": 150,
+  "len": 12
+ },
+ {
+  "cat": "indoor_dynamic",
+  "id": "wsNOEwkBnag",
+  "start": 300,
+  "len": 12
+ },
+ {
+  "cat": "outdoor_static",
+  "id": "IGYh7GIuShM",
+  "start": 400,
+  "len": 12
+ },
+ {
+  "cat": "outdoor_static",
+  "id": "6pz0qi97eZM",
+  "start": 100,
+  "len": 12
+ },
+ {
+  "cat": "outdoor_dynamic",
+  "id": "DPumdBzLxqc",
+  "start": 700,
+  "len": 12
+ },
+ {
+  "cat": "outdoor_dynamic",
+  "id": "PkJw72ytAtU",
+  "start": 400,
+  "len": 12
+ },
+ {
+  "cat": "driving",
+  "id": "BTbkSEotmX0",
+  "start": 200,
+  "len": 12
+ },
+ {
+  "cat": "driving",
+  "id": "uRbDaKgz1_w",
+  "start": 250,
+  "len": 12
+ },
+ {
+  "cat": "embodied",
+  "id": "ZA2U9upkrjo",
+  "start": 60,
+  "len": 12
+ },
+ {
+  "cat": "embodied",
+  "id": "DbpscUqeXYA",
+  "start": 500,
+  "len": 12
+ }
+]

@@ -1,0 +1,9 @@
+# name	url	commit	used_for
+vipe	https://github.com/nv-tlabs/vipe.git	8c9f36144e08d8f8c8cf60d20ad70c100d9cff07	② intrinsics K + metric scale (BA); ③ QC partner
+Pi3	https://github.com/yyfz/Pi3.git	9fa3ddb3f8d53041f8b2738df404f62223bbaa7b	② main annotator: Pi3X conditioned on K (pose + depth)
+depth-anything-3	https://github.com/ByteDance-Seed/depth-anything-3.git	3d835ec1a5802d64a8b8b15f817a1ab54809bfe4	③ QC witness (DA3 on ViPE cameras); ② K-gate fallback
+vggt-omega	https://github.com/facebookresearch/vggt-omega.git	48b23c8ce72c9a8fcf987f0d7f43d8e4870759f6	benchmarks only (not in v1.3)
+MoGe	https://github.com/microsoft/MoGe.git	74fbce054ebed49800de42d0ad0e83495065719a	E12 only (not adopted)
+SpatialVID	https://github.com/NJU-3DV/SpatialVID.git	23840d4ec122ae6de646c4bd5a5e9474c937719e	baseline comparison only
+HunyuanWorld-Voyager	https://github.com/Tencent-Hunyuan/HunyuanWorld-Voyager.git	6218ccd36df77d0254dcf24ad1fb77312f75b04a	benchmark only (Voyager data engine)
+map-anything	https://github.com/facebookresearch/map-anything.git	main@2026-10 (tarball, no git metadata)	E10 only (not adopted)

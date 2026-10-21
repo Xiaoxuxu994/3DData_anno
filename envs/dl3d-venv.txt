@@ -1,0 +1,25 @@
+# frozen from cache/dl3d-venv (Python 3.12.15) on 2026-10-21
+anyio==4.15.1
+certifi==2026.7.22
+charset_normalizer==3.5.2
+click==8.5.0
+filelock==4.2.0
+fsspec==2026.9.0
+h11==0.16.0
+hf_xet==1.7.0
+httpcore2==2.13.1
+httpx2==2.13.1
+huggingface_hub==2.2.0
+idna==3.20
+numpy==2.5.4
+opencv_python_headless==5.0.0.93
+packaging==26.3
+pillow==12.3.0
+pyyaml==6.0.3
+remotezip==0.12.6
+requests==2.34.2
+scipy==1.18.1
+tqdm==4.70.1
+truststore==0.10.5
+typing_extensions==4.16.0
+urllib3==2.8.0

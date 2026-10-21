@@ -1,0 +1,27 @@
+# third-party repos: cloned by third_party/clone.sh at the commits in third_party/repos.lock
+/vipe/
+/Pi3/
+/depth-anything-3/
+/vggt-omega/
+/map-anything/
+/MoGe/
+/SpatialVID/
+/HunyuanWorld-Voyager/
+/PURE/
+/_dl/
+/_restore/
+# python / macOS junk
+__pycache__/
+*.pyc
+._*
+.DS_Store
+*.bak
+*.bak_*
+# results never go in git (they live under $ANNO_ROOT/outputs)
+*.npz
+*.npy
+*.ply
+*.mp4
+*.pt
+*.pth
+*.safetensors

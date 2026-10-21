@@ -1,0 +1,17 @@
+# frozen from cache/dl-venv (Python 3.12.15) on 2026-10-21
+anyio==4.15.1
+click==8.5.0
+filelock==4.2.0
+fsspec==2026.9.0
+h11==0.16.0
+hf_transfer==0.1.9
+hf_xet==1.7.0
+httpcore2==2.13.1
+httpx2==2.13.1
+huggingface_hub==2.2.0
+idna==3.20
+packaging==26.3
+pyyaml==6.0.3
+tqdm==4.70.1
+truststore==0.10.5
+typing_extensions==4.16.0
