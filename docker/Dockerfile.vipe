@@ -1,0 +1,9 @@
+# z00533370/vipe:cu128  (built 2026-10-14; image still present on the host)
+FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git git-lfs curl wget build-essential ninja-build cmake pkg-config libeigen3-dev zlib1g-dev \
+    ffmpeg libgl1 libglib2.0-0 libsm6 libxext6 vim htop tmux less unzip && rm -rf /var/lib/apt/lists/*
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+ENV CUDA_HOME=/usr/local/cuda TORCH_CUDA_ARCH_LIST="9.0" MAX_JOBS=32 UV_LINK_MODE=copy
+CMD ["sleep", "infinity"]

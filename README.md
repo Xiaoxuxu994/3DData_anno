@@ -44,6 +44,7 @@ bash tests/regression_A.sh                        # 改代码后：A 组回归�
 
 | 文件 | 内容 |
 |---|---|
+| `AGENTS.md` | **执行手册**（给 AI agent 和新同事）：环境、硬性规则、命令、输入输出、完成标准 |
 | `docs/ARCHITECTURE.md` | 四层管线的细节、阈值、结果和成本 |
 | `docs/CODE_MAP.md` | 每个目录做什么、哪些是生产代码、路径约定 |
 | `docs/WEIGHTS_DATA.md` | 模型权重、数据集和结果的位置与来源 |

@@ -18,6 +18,7 @@
 | `envs/` | 各 Python 环境的包列表与重建方法 | |
 | `configs/` | `pipeline_v13.yaml`：当前最佳配置与参考指标 | |
 | `docs/` | 架构、代码地图、权重与数据、已知问题、实验记录 | |
+| `docker/` | 开发容器：`run_dev.sh`（重建容器）、`Dockerfile.vipe`（镜像） | |
 | `tools/relocate.py` | 把脚本里的原根路径换成新根路径 | |
 
 ## 路径约定
