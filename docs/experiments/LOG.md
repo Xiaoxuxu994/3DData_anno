@@ -478,7 +478,7 @@ review labels), commercial-licence depth/pose model.
   OMP/BLAS threads = 3 and 20 workers (`run_eval.sh`); always cap threads on this shared host.
 
 ## E15 — GLR track: GLRMap annotator behind the 3DData_anno filter and QC; sandbox evidence on easy web-style clips (2026-10-29, CPU only)
-(status: running; the criteria below were written before the silver-reference and variant results were looked at)
+(status: done for the sandbox part; the criteria below were written before the silver-reference and variant results were looked at; amendments are listed with their timing)
 - Question: can GLRMap (SfM + RoMa + PDA, non-metric) be put between the v1.3 front end (rules + VLM judge) and the v1.3 back end (cross-witness
   QC v1c + flags) so that a batch can be run without a human, with v1.3 as the fallback? What can be said without a GPU, without the GLRMap code
   and without the user's servers?
@@ -511,3 +511,31 @@ review labels), commercial-licence depth/pose model.
 - Known limitation of the replica (stated up front): it is harsher than the real stage 1 (full resolution, ~100 frames, guided matching), so signals
   that depend on resolution (points per image, planar-pair fraction) are NOT comparable with the evaluation sessions' numbers; clips that stop on
   them are rerun at 960 px (`v0a_hq960`) before anything is concluded.
+
+### E15 results (sandbox, CPU; `docs/GLR_E15_summary.html`, tables in `docs/experiments/tables/E15_*.md`)
+- **Front end** (`filter/s1-s5` unchanged on CPU + the labelled Claude VLM surrogate, two judges per anonymised contact sheet, 32 / 34 agree; optical flow only for
+  13 clips): easy 17 / 18 pass (`px_19834200` is rejected by `static_text_area` - the lit-corridor false positive of KNOWN_ISSUES 9); 16 / 16 controls are kept out
+  of GLR (rules 4, VLM 9, router 3 driving clips sent to v1.3); every control is stopped by at least two layers. The faint watermark of `ia_telangana`
+  (~0.5 % of the frame) is seen by neither the rules nor the VLM.
+- **Stage-1 gate on the replica (v0a)**: easy 7 ok / 11 stop (`fx_fy_mismatch` 7, no model 2, points per image 2, planar pairs 1); controls 15 stop / 1 ok
+  (the fisheye clip). The 2 clips without a model (`mk_5290`, `px_4072162`) stay without a model at 960 px for `mk_5290`; `px_4072162` gets a model at 960 px
+  (focal +166 % vs the reference, gate ok).
+- **Against the silver reference** (16 scored; the reference failed on `mk_50847`, `gov_grca_hd10_c32a46`): true stop 9, true pass 3, **silent error 4,
+  false stop 0**. Poses are mostly right (Sim(3) ATE <= 3.27 % in 11 / 14, median 0.28 %); the focal is not (|error| > 10 % in 11 / 14, median ~43 %).
+- **Variants**: v0b (other mapper seed) reproduces v0a - the focal error is deterministic, repeated runs cannot expose it. v1sp (SIMPLE_PINHOLE): gate pass 13 / 16 but
+  only 3 silver-accurate, **silent errors 10** (v0a: 4) - the constraint removes the `fx_fy_mismatch` alarm without fixing the focal. v2prior / v3fixed (GeoCalib
+  focal as start value / fixed): see `E15_sweep_tables.md` table B (only the clips that got GeoCalib in time).
+- **Three-way focal table (post-hoc)**: on the aerial NPS clips replica, silver reference and GeoCalib disagree by factors of 2-4 (reference f/W 0.27-0.38, replica
+  0.9-1.4, GeoCalib 0.83), so a single silver reference cannot arbitrate K; where the replica and GeoCalib agree and the reference differs (`mk_41574`) the reference
+  is the odd one out.
+- **Demo** (`run_demo.sh`, 7 clips, stand-in dense stage and witnesses, no v1.3 fallback): 2 T2 labels (`ia_telangana`; `mk_4206` whose focal is 22 % off still passes
+  v1c, kdis 10.8 deg < 13.2), 1 filter reject, 2 gate stops, 2 QC rejects (`ia_victory`: kdis 16.3 deg; `mk_43622`: xdepth_k 0.31 from the two different sparse-point
+  interpolations of the stand-ins - an artefact of the stand-ins, not a verdict on the label).
+- **Decision**: no adoption into production; v1.3 and its config are unchanged. The GLR track stays an experimental, off-by-default route (`pipeline/run_batch_glr.sh`).
+  The stage-1 gate stays as designed (its `fx_fy_mismatch` rule is the K-observability alarm); do NOT switch the stage-1 camera model to SIMPLE_PINHOLE on its own;
+  K for clips where the focal is unobservable has to come from outside the SfM (GeoCalib / Pi3X / DA3 median, or the E14 focal sweep) - to be decided on the server
+  (`docs/GLR_PHASE0_RUNBOOK.md` 0.2b), not on these numbers.
+- **Failures / lessons**: (1) the independent visual check moved `mk_3110` (a "slider" clip) to the controls - the optical-flow parallax proxy cannot tell a pan from
+  a translation, the rotation-model index can (<= 0.06 vs >= 0.8); (2) my summariser first read `sparse/0` (not the largest model) for the incremental-mapper
+  references, found through empty ATE cells, fixed and recorded above; (3) GeoCalib on 4 shared CPU cores took 5-20 min per clip, which limited the K-prior
+  variants to a subset; (4) the second independent review (of the hardening) and the verification of the Internet Archive / NPS clips were stopped for budget.

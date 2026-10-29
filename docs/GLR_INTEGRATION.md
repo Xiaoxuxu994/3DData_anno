@@ -58,7 +58,7 @@
 
 ## 5. 已验证 / 未验证
 
-（沙箱测试结果表在 §7，跑完后填入。）
+（沙箱测试结果在 §7。）
 
 **已验证（沙箱，合成数据 + 真实 COLMAP 模型读写，`tests/glr/` 177 项）**：路由与抽帧规则（含无光流统计、长/短片段时的帧数窗口）；第一阶段关口规则（评估会话里的 KITTI / 无人机 / 室内 / 东京 / Ahlbeck 的数值作回归夹具；竖屏焦距规则；关口自身失败 → `error`，不会被读成 ok）；模型和数据库读取（`load_cameras` 与输入相机逐元素一致；路径里带 `#`、`?`、`%` 的数据库）；E3b 米制尺度恢复，以及**被复制的数值代码与原始脚本逐项对拍**（`test_fidelity.py`：`umeyama` / `traj_pct` / `depth_cmp` / `to_grid` / E9 旗标 / `qc_grid` / E3b 从原文件用 `ast` 抽出来比较）；v1c 三项、`jump60`、`fov_out`、关口 stop/suspect/error/缺失、深度缺失/覆盖不足、尺度无证据的分级逻辑；worker 的 split / mono / dry-run / 不覆盖 / 退出码 / 恶意片段名 / SIGTERM 停整组进程 / `taskset`+`timeout` 覆盖整个命令模板 / `RESULT_DIR` 最后写；编排脚本的各阶段、`--gpus` 转发、失败汇总与重跑、`--dry-run` 零写入；merge 的软链接随判定改指；配置文件与默认值一致。
 
@@ -73,6 +73,13 @@
 5. H200 上 `--phase=c`；先看 `qc_glr/*.json` 的 `glr.depth_source` 和 `info_flags`。
 6. 在 A 组的一两段（有真值）上用 `--skip-filter --glr-all` 跑，对 `outputs/bench/eval3d_A` 评测 GLR 标签，数字写进 `docs/experiments/LOG.md`，再谈采纳。
 
-## 7. 沙箱测试结果
+## 7. 沙箱测试结果（E15，CPU only）
 
-（待填：OOD 片段集、筛选结果、第一阶段复刻与校验、关口信号表。）
+完整的结果页：`docs/GLR_E15_summary.html`（离线可开）和同内容的 Markdown 版 `docs/GLR_E15_沙箱测试报告.md`；逐片段表在 `docs/experiments/tables/`；片段清单（许可证、sha256、重建方法）在 `docs/experiments/E15_ood_manifest.json`；实验记录在 `docs/experiments/LOG.md` 的 E15 一节。**第一阶段是 pycolmap 复刻（降本版），VLM 是 Claude 替身，没有 GLRMap 代码和 GPU**，所以下面是线索，不是 GLRMap 的验收。
+
+- **片段集**：18 条简单网络视频（Mixkit 7、Pexels 4、Internet Archive 3、美国国家公园局 B-roll 4）+ 16 条硬对照（其中 5 条因许可证只在本地试过）。12 条 Mixkit / Pexels 简单片段各经两个独立代理核验（画面 + 来源）；核验把 `mk_3110` 改成了无视差对照（纯摇镜），发现 `ia_telangana` 带一条淡水印，并纠正了 Mixkit 记录里的作者字段。
+- **前端（规则 + VLM 替身）**：简单片段 17 / 18 通过（`px_19834200` 被 `static_text_area` 误拒）；对照 16 / 16 没有变成 GLR 标签（规则拒 4、VLM 拒 9、路由送去 v1.3 的 3 条开车类），没有哪条只靠单独一层。淡水印那条规则和 VLM 都没看见。
+- **出口关口（复刻 v0a）**：简单片段 7 条 ok、11 条 stop（`fx_fy_mismatch` 7、没出模型 2、每图点数太少 2、平面对占比高 1）；对照 15 条 stop，1 条 ok（鱼眼 `ctl_misc_14774`：关口没有拦，靠 VLM 拦）。
+- **对银参考**（16 条有参考，2 条参考自己失败）：拦对 9、通过且准 3、**静默错误 4**、误拦 0。轨迹基本是准的（11 / 14 条 ATE ≤ 3.27 %），焦距不是（11 / 14 条差 > 10 %）。换种子（v0b）结果不变；SIMPLE_PINHOLE（v1sp）把过关口的从 7 条提到 13 条，但静默错误从 4 条升到 10 条：它关掉了 `fx_fy_mismatch` 这个焦距不可观测的警报，没有修好焦距。KNOWN_ISSUES 第 10 条。
+- **联调演示**（真实片段，稠密深度和证人是替身，没有 v1.3 回退标签）：7 条里 2 条以 T2 出标签（`ia_telangana`；`mk_4206` 焦距偏 22 % 仍通过质检），1 条被前端误拒，2 条被关口拦下（`mk_41574`、`mk_21589`），2 条被质检拒（`ia_victory`：K 证人分歧 16°；`mk_43622`：替身深度对替身证人 `xdepth_k` 0.31，是替身造成的）。
+- **没做到**：真实 GLRMap / RoMa / PDA / ViPE / Pi3X 的任何运行；第二轮独立评审（因预算停止）。
