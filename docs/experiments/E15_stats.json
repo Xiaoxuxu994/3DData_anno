@@ -1,0 +1,2 @@
+{"tests": "190+", "vlm_agree": "全部片段（两位评审对“可重建”结论一致的片段数见 LOG.md E15）",
+ "review": {"raw": 63, "high": 16, "medium": 33, "low": 14, "lenses": ["contract", "rules", "failure", "tests"]}}
