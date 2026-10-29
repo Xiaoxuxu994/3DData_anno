@@ -179,7 +179,10 @@ class Worker(unittest.TestCase):
     def test_placeholders_are_quote_aware(self):
         jd, _ = _fix.make_job(self.out, "a b", n_orig=40)
         cmd = ("printf '%s' \"{images}|{threads}\" > \"{out}/p1\"; printf '%s' {s1}/sparse > {out}/p2; printf '%s' '{images}' > {out}/p3; "
-               "printf '%s' {py} > {out}/p4")
+               "printf '%s' {py} > {out}/p4; printf '%s|%s' {focal_w} {hfov} > {out}/p5")
+        jj = json.loads((jd / "job.json").read_text())
+        jj["k_prior"] = {"hfov_deg": 70.0}
+        (jd / "job.json").write_text(json.dumps(jj))
         r = run(jd, "--mode=split", env={"GLR_STAGE1_CMD": cmd})
         self.assertEqual(r.returncode, 3, r.stdout + r.stderr)    # no model -> the gate stops
         d, j = self.result(jd)
@@ -187,6 +190,9 @@ class Worker(unittest.TestCase):
         self.assertEqual((d / "p2").read_text(), f"{os.path.realpath(d)}/stage1/sparse")
         self.assertEqual((d / "p3").read_text(), "{images}")       # single quotes: left alone
         self.assertEqual((d / "p4").read_text(), sys.executable)
+        fw, hf = (d / "p5").read_text().split("|")
+        self.assertAlmostEqual(float(fw), 0.5 / __import__("math").tan(__import__("math").radians(35.0)), places=4)   # the job's K prior
+        self.assertEqual(float(hf), 70.0)
         self.assertEqual(j["status"], "stopped_at_gate")
         self.assertEqual(json.loads((d / "gate.json").read_text())["stop"], ["no_model"])
 

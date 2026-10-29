@@ -102,6 +102,10 @@ class Orchestrator(unittest.TestCase):
         self.assertEqual(sorted(str(p.relative_to(self.out)) for p in self.out.rglob("*")), before)     # no logs/, no result dirs
         r = self.run_batch(self.out, "--phase=c", "--dry-run")
         self.assertIn("[dry-run]", r.stdout)
+        self.assertNotIn("--witness-dir", r.stdout)
+        r = self.run_batch(self.out, "--phase=c", "--dry-run", "--witness-dir=/some/dir")
+        self.assertIn("glr_collect.py", r.stdout)
+        self.assertIn("--witness-dir /some/dir", r.stdout)
         self.assertEqual(sorted(str(p.relative_to(self.out)) for p in self.out.rglob("*")), before)
 
     # ---- phase b preconditions ---------------------------------------------------------------------------------------------------

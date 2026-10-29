@@ -1,4 +1,7 @@
 import csv
+import hashlib
+import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -71,6 +74,47 @@ class GateReplay(unittest.TestCase):
             row = next(csv.DictReader(fh))
         self.assertEqual(row["verdict"], "error")
         self.assertIn("WARNING: 1 runs could not be read", r.stdout)
+
+
+@unittest.skipUnless(shutil.which("ffmpeg"), "ffmpeg not installed")
+class FetchOodSet(unittest.TestCase):
+    def test_fetch_cut_verify_and_never_overwrite(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = Path(td)
+            src = td / "host" / "clip_a.mp4"
+            src.parent.mkdir()
+            subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=25:duration=6",
+                            "-pix_fmt", "yuv420p", str(src)], check=True)
+            good = hashlib.sha256(src.read_bytes()).hexdigest()
+            clips = [{"id": "ok1", "role": "easy", "license": "test", "page_url": "p", "download_url": src.as_uri(), "raw_name": "clip_a.mp4",
+                      "raw_sha256": good, "window_start": 1.0, "window_dur": 3.0},
+                     {"id": "bad_hash", "role": "easy", "license": "test", "page_url": "p", "download_url": src.as_uri(), "raw_name": "clip_a.mp4",
+                      "raw_sha256": "0" * 64, "window_start": 0.0, "window_dur": 2.0},
+                     {"id": "ctl1", "role": "control_negative", "license": "test", "page_url": "p", "download_url": src.as_uri(), "raw_name": "c.mp4",
+                      "raw_sha256": good, "window_start": 0.0, "window_dur": 2.0}]
+            man = td / "man.json"
+            man.write_text(json.dumps({"clips": clips}))
+            run = lambda *a: subprocess.run([sys.executable, str(REPO / "tools" / "fetch_ood_set.py"), str(man), str(td / "out"), *a],  # noqa: E731
+                                            capture_output=True, text=True)
+            r = run()
+            self.assertEqual(r.returncode, 1, r.stdout + r.stderr)                      # the hash mismatch is reported, not silently accepted
+            self.assertIn("bad_hash", r.stderr)
+            self.assertTrue((td / "out" / "clips" / "ok1.mp4").exists() and (td / "out" / "clips" / "ctl1.mp4").exists())
+            self.assertFalse((td / "out" / "clips" / "bad_hash.mp4").exists())
+            probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=r_frame_rate,width,height:format=duration", "-of", "json",
+                                    str(td / "out" / "clips" / "ok1.mp4")], capture_output=True, text=True)
+            info = json.loads(probe.stdout)
+            self.assertEqual(info["streams"][0]["r_frame_rate"], "15/1")
+            self.assertAlmostEqual(float(info["format"]["duration"]), 3.0, delta=0.2)
+            lines = (td / "out" / "clips.txt").read_text().split()
+            self.assertEqual(sorted(Path(x).name for x in lines), ["ctl1.mp4", "ok1.mp4"])
+            before = (td / "out" / "clips" / "ok1.mp4").read_bytes()
+            r = run("--only", "ok1")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual((td / "out" / "clips" / "ok1.mp4").read_bytes(), before)    # an existing clip is kept
+            r = run("--role", "control_negative")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(run("--only", "bad_hash", "--no-verify").returncode, 0)
 
 
 if __name__ == "__main__":

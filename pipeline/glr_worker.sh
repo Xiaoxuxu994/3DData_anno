@@ -22,8 +22,11 @@
 #   GLR_CAMERA_MODEL  PINHOLE (GLRMap default) | SIMPLE_PINHOLE (fx = fy)
 #   GLR_RUN_CMD   mono: default `bash data_generate_demo/run_all.sh`; it reads IMAGES, OUTPUT (+ MASK_DIR) from the environment
 #   GLR_STAGE1_CMD / GLR_DENSE_CMD   split templates (bash command lines, run by `bash -c` from GLRMAP_HOME); placeholders
-#                 {images} {out} {s1} {threads} {py} become references to the variables GLR_IMAGES GLR_OUT GLR_S1 GLR_THREADS GLR_PY
-#                 (quote-aware: write them bare or inside "..."; values with blanks, quotes, ';' or '&' stay data, never code)
+#                 {images} {out} {s1} {threads} {py} {focal_w} {hfov} become references to the variables GLR_IMAGES GLR_OUT GLR_S1
+#                 GLR_THREADS GLR_PY GLR_FOCAL_W GLR_HFOV (quote-aware: write them bare or inside "..."; values with blanks, quotes,
+#                 ';' or '&' stay data, never code). {hfov} / {focal_w} = the image-only K prior of the job (median HFOV in degrees of
+#                 GeoCalib / Pi3X / DA3, and the same as focal / image width) - empty when the job has none. GLRMap's own CLI decides
+#                 whether it can take an initial focal; the pycolmap replica (tools/stage1_sfm.py --focal-w) can.
 #                 default stage 1: {py} -m reconstruction_flow.glomap --images {images} --output {s1} --camera-model $GLR_CAMERA_MODEL
 #                 dense: no default - derive it from data_generate_demo/run_roma_pcd.sh and run_pda_depth.sh (docs/GLR_INTEGRATION.md)
 # Output (never overwritten: result, result_1, ...). JOB_DIR/RESULT_DIR (the name of the result directory) is written LAST, after
@@ -68,7 +71,10 @@ command -v setsid > /dev/null 2>&1 && WRAP=(setsid "${WRAP[@]}")   # own process
 
 CLIP=$(basename "$JOB")
 IMAGES=$JOB/images
-read -r NFR FIRST_IMG < <("$PY" -c 'import json,sys; j=json.load(open(sys.argv[1])); print(len(j["image_names"]), j["image_names"][0])' "$JOB/job.json" 2> /dev/null)
+read -r NFR FIRST_IMG HFOV FOCAL_W < <("$PY" -c 'import json,math,sys
+j = json.load(open(sys.argv[1])); h = (j.get("k_prior") or {}).get("hfov_deg")
+print(len(j["image_names"]), j["image_names"][0], "%.4f" % h if h else "-", "%.5f" % (0.5 / math.tan(math.radians(h) / 2)) if h else "-")' "$JOB/job.json" 2> /dev/null)
+[ "$HFOV" != - ] || HFOV=""; [ "$FOCAL_W" != - ] || FOCAL_W=""
 if [ $DRY = 0 ]; then
   [ -n "$NFR" ] || { echo "cannot read image_names from $JOB/job.json with PY_GLR=$PY"; exit 4; }
   "$PY" -c 'import numpy, pycolmap' 2> /dev/null || { echo "PY_GLR=$PY cannot import numpy and pycolmap (the stage-1 gate needs them)"; exit 4; }
@@ -91,14 +97,14 @@ else
 fi
 STATUS=failed; GATE=""; DENSE_RAN=0; RC=0; CHILD=""; FINISHED=0; MODEL=""
 CMDS=()
-export GLR_IMAGES=$IMAGES GLR_OUT=$RES GLR_S1=$RES/stage1 GLR_THREADS=$THREADS GLR_PY=$PY
+export GLR_IMAGES=$IMAGES GLR_OUT=$RES GLR_S1=$RES/stage1 GLR_THREADS=$THREADS GLR_PY=$PY GLR_FOCAL_W=$FOCAL_W GLR_HFOV=$HFOV
 
-fill() {  # fill TEMPLATE : {images} {out} {s1} {threads} {py} -> "${GLR_IMAGES}" ... (bash expands them when the template runs)
+fill() {  # fill TEMPLATE : {images} {out} {s1} {threads} {py} {focal_w} {hfov} -> "${GLR_IMAGES}" ... (bash expands them when the template runs)
   local t=$1 o="" q="" c name hit i=0 n=${#1}
   while [ $i -lt $n ]; do
     c=${t:$i:1}; hit=""
     if [ "$c" = "{" ]; then
-      for name in images out s1 threads py; do
+      for name in images out s1 threads py focal_w hfov; do
         [ "${t:$i:$((${#name} + 2))}" = "{$name}" ] && { hit=$name; break; }
       done
     fi

@@ -13,6 +13,8 @@
 #   --worker-mode=mono|split   passed to glr_worker.sh (default mono = GLRMap's own run_all.sh; split needs GLR_DENSE_CMD, or GLR_STAGE1_ONLY=1)
 #   --glr-force         continue after a stage-1 gate stop (the verdict still rejects the label in phase c)
 #   --glr-retry         also run again the jobs whose last result is `failed` / `gate_error` (interrupted or unfinished jobs always run again)
+#   --witness-dir=DIR   phase c: read the witness bundle of each clip from DIR/<clip>.npz (glr_collect.load_witness_npz) instead of the experiments'
+#                       bench layout - for offline runs and tests; the real witnesses (ViPE, DA3, K sources) come from run_batch.sh
 #   --gpus=LIST         GPUs for run_batch.sh AND for the GLRMap worker (CUDA_VISIBLE_DEVICES). Without it phase b takes one idle GPU (pick_gpus)
 #   --dry-run           print what would run (phase a and c are only listed); nothing is created or written
 # Output: everything of run_batch.sh (labels/, qc/, results.csv, filter/ ...) plus filter/glr_route.csv, glr_jobs/<clip>/, labels_glr/, qc_glr/,
@@ -26,12 +28,12 @@ set -o pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 source "$HERE/common.sh"
 PY_GLR=${PY_GLR:-$ROOT/cache/glrmap-venv/bin/python}
-usage() { sed -n 2,24p "$0"; }
+usage() { sed -n 2,26p "$0"; }
 
 [ $# -ge 1 ] && [ -n "$1" ] || { usage; exit 2; }
 OUT=$(realpath -m -- "$1"); shift
 [ -n "$OUT" ] && [ "$OUT" != / ] || { usage; exit 2; }
-PASS=(); INPUTS=(); PHASE=all; GLRALL=0; WMODE=mono; GFORCE=0; GRETRY=0; DRY=0; GPUS_OPT=""
+PASS=(); INPUTS=(); PHASE=all; GLRALL=0; WMODE=mono; GFORCE=0; GRETRY=0; DRY=0; GPUS_OPT=""; WDIR=""
 for a in "$@"; do
   case $a in
     --phase=*) PHASE=${a#*=} ;;
@@ -39,6 +41,7 @@ for a in "$@"; do
     --worker-mode=*) WMODE=${a#*=} ;;
     --glr-force) GFORCE=1 ;;
     --glr-retry) GRETRY=1 ;;
+    --witness-dir=*) WDIR=${a#*=} ;;
     --dry-run) DRY=1 ;;
     --gpus=*) GPUS_OPT=${a#*=}; PASS+=("$a") ;;
     --skip-filter|--skip-vlm|--split-cuts|--force-annotate|--fps=*|--max-frames=*|--long=*|--gt-bench=*) PASS+=("$a") ;;
@@ -115,7 +118,8 @@ if [ $PHASE = b ] || [ $PHASE = all ]; then
 fi
 
 if [ $PHASE = c ] || [ $PHASE = all ]; then
-  run step g_collect run_py "" $PY_QC glr_collect.py "$OUT" || exit 1
+  CO=(); [ -n "$WDIR" ] && CO+=(--witness-dir "$WDIR")
+  run step g_collect run_py "" $PY_QC glr_collect.py "$OUT" "${CO[@]}" || exit 1
   run step g_merge   run_py "" $PY_QC glr_merge.py "$OUT" || exit 1
   [ $DRY = 1 ] || { [ -f "$OUT/final/results.csv" ] && cat "$OUT/final/results.csv"; }
 fi
