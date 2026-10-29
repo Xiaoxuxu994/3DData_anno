@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import tempfile
 import unittest
@@ -95,7 +96,7 @@ class GateRules(unittest.TestCase):
         self.assertNotIn("hfov_out_of_range", G.gate({"n_reg": 90, "n_points": 9000, "hfov_deg": 60.0}, None, 100)["stop"])
 
 
-@unittest.skipUnless(__import__("importlib").util.find_spec("pycolmap"), "pycolmap not installed")
+@unittest.skipUnless(importlib.util.find_spec("pycolmap"), "pycolmap not installed")
 class RealModelIO(unittest.TestCase):
     """Synthetic scene -> COLMAP text model + database -> summarize_model / summarize_db / load_cameras / CLI."""
 

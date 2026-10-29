@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import os
 import shutil
@@ -13,7 +14,7 @@ import _fix
 
 WORKER = _fix.PIPE / "glr_worker.sh"
 HERE = Path(__file__).resolve().parent
-HAS_PYCOLMAP = __import__("importlib").util.find_spec("pycolmap") is not None
+HAS_PYCOLMAP = importlib.util.find_spec("pycolmap") is not None
 CPU0 = str(sorted(os.sched_getaffinity(0))[0]) if hasattr(os, "sched_getaffinity") else "0"
 
 

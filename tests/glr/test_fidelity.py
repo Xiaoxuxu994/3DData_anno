@@ -2,6 +2,7 @@
 not importable (hard-coded roots, OpenEXR), so this test pulls the ORIGINAL functions out of their source files with `ast`, runs them in a
 clean namespace and compares the copies with them on random inputs. A drift in either direction fails here.
 Skipped item by item when an original is not in the checkout."""
+import importlib.util
 import ast
 import unittest
 import warnings
@@ -106,7 +107,7 @@ class Geometry(unittest.TestCase):
                     self.assertTrue(same(a[key], b[key]) and same(b[key], c[key]), (key, turn, fps, a[key], b[key], c[key]))
 
 
-@unittest.skipUnless(__import__("importlib").util.find_spec("pandas"), "pandas not installed")
+@unittest.skipUnless(importlib.util.find_spec("pandas"), "pandas not installed")
 class ScaleRule(unittest.TestCase):
     """glr_common.metric_scale vs evolution/e3_scale_vote.one() + votes() (column k_vipe_td = E3b)."""
 

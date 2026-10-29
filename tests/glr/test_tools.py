@@ -1,3 +1,4 @@
+import importlib.util
 import csv
 import hashlib
 import json
@@ -15,7 +16,7 @@ import _fix
 REPO = Path(__file__).resolve().parents[2]
 
 
-@unittest.skipUnless(__import__("importlib").util.find_spec("pycolmap"), "pycolmap not installed")
+@unittest.skipUnless(importlib.util.find_spec("pycolmap"), "pycolmap not installed")
 class GateReplay(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

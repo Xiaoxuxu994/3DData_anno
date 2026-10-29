@@ -1,3 +1,4 @@
+import importlib.util
 import csv
 import json
 import subprocess
@@ -227,7 +228,7 @@ class QC(unittest.TestCase):
         self.assertEqual(qc["tier"], "T2")
 
 
-@unittest.skipUnless(__import__("importlib").util.find_spec("pycolmap"), "pycolmap not installed")
+@unittest.skipUnless(importlib.util.find_spec("pycolmap"), "pycolmap not installed")
 class ReadGlr(unittest.TestCase):
     def test_read_glr_from_text_model_and_fused_depth(self):
         with tempfile.TemporaryDirectory() as td:

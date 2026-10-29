@@ -1,5 +1,6 @@
 """pipeline/run_batch_glr.sh: usage guards, phase handling, GPU / CPU-cap forwarding, job skipping and failure reporting.
 Runs the real scripts against a throw-away ANNO_ROOT (code -> this checkout, cache/qc-venv/bin/python -> the interpreter running the tests)."""
+import importlib.util
 import csv
 import json
 import os
@@ -14,7 +15,7 @@ import _fix
 REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "pipeline" / "run_batch_glr.sh"
 HERE = Path(__file__).resolve().parent
-HAS_PYCOLMAP = __import__("importlib").util.find_spec("pycolmap") is not None
+HAS_PYCOLMAP = importlib.util.find_spec("pycolmap") is not None
 
 
 class Orchestrator(unittest.TestCase):
