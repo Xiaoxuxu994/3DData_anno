@@ -162,10 +162,22 @@ class _MD(HTMLParser):
         else:
             self.out.append(t)
 
+    VOID = ("img", "br", "meta", "link", "hr", "input")
+
     def handle_starttag(self, tag, at):
         at = dict(at)
         cls = at.get("class", "") or ""
+        if tag in self.VOID:        # void elements have no end tag: they must not go on the stack
+            if self.skip:
+                return
+            if tag == "img" and at.get("data-file"):
+                self.w(f"![{at.get('alt', '')}]({self.fig_dir}/{at['data-file']})")
+            elif tag == "br":
+                self.w(" ")
+            return
         if tag in ("style", "title", "script", "nav") or "gal" in cls.split() or "ph" in cls.split():
+            if "gal" in cls.split() and not self.skip:
+                self.w("\n\n（缩略图和逐片段徽章见网页版 `GLR_E15_summary.html`；逐片段结果见下面的总表。）\n")
             self.skip += 1
             self.stack.append((tag, True))
             return
@@ -198,10 +210,6 @@ class _MD(HTMLParser):
         elif tag == "a":
             self.href = at.get("href", "")
             self.w("[")
-        elif tag == "img":
-            f = at.get("data-file")
-            if f:
-                self.w(f"![{at.get('alt', '')}]({self.fig_dir}/{f})")
         elif tag == "table":
             self.rows, self.in_table = [], True
         elif tag == "tr":
@@ -212,8 +220,6 @@ class _MD(HTMLParser):
             self.w("\n\n**")
         elif tag == "figcaption":
             self.w("\n\n*")
-        elif tag == "br":
-            self.w(" ")
 
     def handle_endtag(self, tag):
         top = self.stack.pop() if self.stack else (tag, False)

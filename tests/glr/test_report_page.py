@@ -24,7 +24,7 @@ class HtmlToMd(unittest.TestCase):
         m = load()
         frag = ('<title>t</title><style>x{}</style><h2>结论<small>sub</small></h2><p>前 <b>读结果前：</b>沙箱 <code>a|b</code></p><ul><li>one <a href="http://x">link</a></li></ul>'
                 '<ol><li>first</li><li>second</li></ol><div class="tw"><table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1|2</td><td><span class="b"><i>✓</i>ok</span></td></tr>'
-                '</tbody></table></div><figure><img src="data:x" alt="图" data-file="f.png"><figcaption>cap</figcaption></figure><div class="gal"><div class="card">skip me</div></div>')
+                '</tbody></table></div><figure><img src="data:x" alt="图" data-file="f.png"><figcaption>cap</figcaption></figure><div class="gal"><div class="card"><div class="ph"><img src="data:y" alt="skipped"></div>skip me</div></div><h2>after the gallery</h2><p>still here</p>')
         md = m.html_to_md(frag, "figures")
         self.assertIn("## 结论 _(sub)_", md)
         self.assertIn("**读结果前：** 沙箱", md)                      # a space after the closing mark: CommonMark would not close it before a CJK character
@@ -35,6 +35,8 @@ class HtmlToMd(unittest.TestCase):
         self.assertIn("| A | B |\n|---|---|\n| 1\\|2 | ✓ok |", md)
         self.assertIn("![图](figures/f.png)", md)
         self.assertNotIn("skip me", md)
+        self.assertIn("## after the gallery", md)                     # a void <img> inside a skipped block must not swallow what follows
+        self.assertIn("still here", md)
         self.assertNotIn("<", md.replace("<", "", 0).split("![图]")[0].replace("&lt;", ""))   # no HTML left in the text part
 
 
