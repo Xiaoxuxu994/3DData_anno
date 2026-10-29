@@ -115,7 +115,7 @@ class RewriteCamera(unittest.TestCase):
         import sqlite3
         src = ast.parse((REPO / "tools" / "stage1_sfm.py").read_text())
         keep = [n for n in src.body if (isinstance(n, ast.Assign) and any(getattr(t, "id", "") in ("MODEL_ID", "LAYOUT") for t in n.targets))
-                or (isinstance(n, ast.FunctionDef) and n.name == "rewrite_camera")]
+                or (isinstance(n, ast.FunctionDef) and n.name in ("rewrite_camera", "put_model_first"))]
         cls.ns = {"np": np, "sqlite3": sqlite3, "sys": sys}
         exec(compile(ast.Module(keep, []), "stage1_sfm.py", "exec"), cls.ns)
 
@@ -133,6 +133,27 @@ class RewriteCamera(unittest.TestCase):
         import sqlite3
         mid, blob, prior = sqlite3.connect(path).execute("select model, params, prior_focal_length from cameras").fetchone()
         return mid, np.frombuffer(blob, np.float64), prior
+
+    def test_largest_model_is_put_at_sparse_0(self):
+        """the incremental mapper numbers models in build order; sparse/0 must be the one stage1.json describes (the gate / worker read the shortest path)"""
+        put = self.ns["put_model_first"]
+        with tempfile.TemporaryDirectory() as td:
+            sp = Path(td) / "sparse"
+            for k in (0, 1, 2):
+                (sp / str(k)).mkdir(parents=True)
+                (sp / str(k) / "who").write_text(f"model{k}")
+            z = put(sp, 2)
+            self.assertEqual(z, sp / "0")
+            self.assertEqual((sp / "0" / "who").read_text(), "model2")            # the best is now at 0 ...
+            self.assertEqual((sp / "2" / "who").read_text(), "model0")            # ... the old 0 took its number, nothing was lost
+            self.assertEqual((sp / "1" / "who").read_text(), "model1")
+            self.assertFalse((sp / "_swap").exists())
+            self.assertEqual(put(sp, 0), sp / "0")                                # already first: untouched
+            self.assertEqual((sp / "0" / "who").read_text(), "model2")
+            only = Path(td) / "only"
+            (only / "3").mkdir(parents=True)                                      # a single model that is not numbered 0
+            self.assertEqual(put(only, 3), only / "0")
+            self.assertTrue((only / "0").is_dir() and not (only / "3").exists())
 
     def test_conversions_keep_the_principal_point(self):
         rw = self.ns["rewrite_camera"]

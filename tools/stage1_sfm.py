@@ -79,6 +79,17 @@ def lap(name):
     t0 = time.time()
 
 
+def put_model_first(sp, best):
+    """sp/<best> -> sp/0; a model that was at sp/0 takes the vacated number. Returns the directory of the model that is now at sp/0."""
+    zero, mdir, tmp = sp / "0", sp / str(best), sp / "_swap"
+    if str(best) != "0":
+        mdir.rename(tmp)
+        if zero.exists():
+            zero.rename(mdir)
+        tmp.rename(zero)
+    return zero
+
+
 MODEL_ID = {"SIMPLE_PINHOLE": 0, "PINHOLE": 1}
 # parameter layout of the COLMAP camera models a database can hold (model id -> names); the first parameter is always a focal length
 LAYOUT = {0: ("f", "cx", "cy"), 1: ("fx", "fy", "cx", "cy"), 2: ("f", "cx", "cy", "k1"), 3: ("f", "cx", "cy", "k1", "k2"),
@@ -197,6 +208,9 @@ if recs:
     mdir = SP / str(best)
     mdir.mkdir(exist_ok=True)
     recs[best].write(str(mdir))
+    if best != 0:    # the incremental mapper numbers models in the order it built them: put the largest at sparse/0, as COLMAP / GLOMAP outputs are read
+        res["model_swapped_from"] = best
+    mdir = put_model_first(SP, best)
     res["model_dir"] = str(mdir)
     res["model"] = G.summarize_model(str(mdir))
 res["db"] = G.summarize_db(str(DB))

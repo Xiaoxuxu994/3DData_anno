@@ -11,7 +11,8 @@ Reads the outputs of tools/stage1_sfm.py laid out as S1_ROOT/<clip>/<run>/{stage
 and writes one row per run (signals, gate verdict, agreement with the reference) plus the tables used in docs/experiments/LOG.md (E15).
 Definitions (pre-declared in LOG.md before the reference results were read): a run is `silver_accurate` iff >= 90 % of its frames registered,
 |f/W - f_ref/W| <= 10 % of f_ref/W for both fx and fy (the worse of the two) and the Sim(3) ATE to the reference over the common frames is <= 3.27 % of the reference path. Gate verdict
-ok / suspect + not silver-accurate = silent error; gate stop + silver-accurate = false stop. The reference is a second SfM run, not ground truth.
+ok / suspect + not silver-accurate = silent error; gate stop + silver-accurate = false stop. The reference is a second SfM run, not ground truth;
+a run is only scored when the reference itself registered >= 90 % of its frames (column ref_failed marks the others, they have no outcome).
 """
 
 import argparse
@@ -44,8 +45,11 @@ def load_run(clip_dir, run):
     base = res["args"].get("reuse_db")
     stride = int((json.loads((Path(base) / "stage1.json").read_text()) if base else res)["args"].get("stride", 1))
     out = {"res": res, "stride": stride, "cams": None}
-    if res.get("model") and (d / "sparse" / "0").exists():
-        out["cams"] = G.load_cameras(d / "sparse" / "0")
+    mdir = Path(res.get("model_dir") or d / "sparse" / "0")                  # the model stage1.json summarised (the largest one), not blindly sparse/0
+    if not mdir.is_dir():
+        mdir = d / "sparse" / Path(res["model_dir"]).name if res.get("model_dir") else mdir   # the run directory was moved
+    if res.get("model") and mdir.is_dir():
+        out["cams"] = G.load_cameras(mdir)
         out["idx"] = np.array([(frame_no(n) - 1) * stride for n in out["cams"]["names"]])
     return out
 
@@ -99,7 +103,12 @@ def row_for(clip, run, r, ref, witness=None):
         else:
             row.update(verdict_w="stop", flags_w="no_model")
     if ref is not None and run != "ref":
-        fr = (ref["res"].get("model") or {}).get("focal_w")
+        rm = ref["res"].get("model") or {}
+        r_img = (ref["res"].get("db") or {}).get("n_images") or 0
+        if not r_img or rm.get("n_reg", 0) / r_img < REG_MIN:
+            row["ref_failed"] = True          # the silver reference itself did not register 90 % of its frames: nothing to score this run against
+            return row
+        fr = rm.get("focal_w")
         if m and fr:
             ex = m["focal_w"] / fr - 1                                          # fx against the reference's single focal ...
             ey = m["focal_w"] / m["fx_fy"] / fr - 1 if m.get("fx_fy") else ex   # ... and fy (= fx / (fx / fy)): a PINHOLE label is only as good as the worse one
@@ -196,10 +205,11 @@ def main(argv=None):
         rr = {r["run"]: r for r in rows if r["clip"] == clip}
         if "ref" not in rr:
             continue
-        t = {"clip": clip, "ref f/W": f(rr["ref"]["focal_w"], 3)}
+        t = {"clip": clip, "ref f/W": f(rr["ref"]["focal_w"], 3) if (rr["ref"]["reg_frac"] or 0) >= REG_MIN else f"reference failed ({rr['ref']['n_reg']}/{rr['ref']['n_img']} frames)"}
         for v in cols[2:]:
             r = rr.get(v)
-            t[v] = "" if r is None else f"{f(r.get('focal_err_pct'), 0)} / {f(r.get('ate_vs_ref_pct'), 1)} / {({'stop': 'S', 'suspect': 's', 'ok': '.'}[r['verdict']])}"
+            t[v] = ("" if r is None else f"{f(r.get('focal_err_pct'), 0)} / {f(r.get('ate_vs_ref_pct'), 1)} / {({'stop': 'S', 'suspect': 's', 'ok': '.'}[r['verdict']])}"
+                    + (" (no reference)" if r.get("ref_failed") else ""))
         tab.append(t)
     md.append(md_table(tab, cols))
     # --- D: controls

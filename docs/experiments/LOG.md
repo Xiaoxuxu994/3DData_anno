@@ -498,6 +498,11 @@ review labels), commercial-licence depth/pose model.
   - a run that passes the stage-1 gate (verdict ok or suspect) but is not silver-accurate is a **silent error**; a run that the gate stops although
     it is silver-accurate is a **false stop**;
   - nothing in `configs/pipeline_glr_v0.yaml` is tuned on these clips; the gate thresholds were fixed before any of them was run.
+  - amendments made after the first 13 references were read and before any variant result (v1sp / v2prior / v3fixed) existed: (1) a run is scored only
+    when the reference itself registered >= 90 % of its frames (otherwise the run has no outcome and is marked `ref_failed`); (2) the model compared is
+    the largest model of each run (`stage1.json: model_dir`) - the first version of the summariser read `sparse/0`, which for 4 of the first 13
+    references (incremental mapper numbers models in build order) was a smaller model, so their ATE was missing (found by looking at the empty cells;
+    `tools/stage1_sfm.py` now writes the largest model to `sparse/0`); (3) both fx and fy are compared with the reference focal (see above).
 - Known limitation of the replica (stated up front): it is harsher than the real stage 1 (full resolution, ~100 frames, guided matching), so signals
   that depend on resolution (points per image, planar-pair fraction) are NOT comparable with the evaluation sessions' numbers; clips that stop on
   them are rerun at 960 px (`v0a_hq960`) before anything is concluded.

@@ -69,8 +69,11 @@ def main(s1_root, pool, jobs, out, clips):
         job = json.loads((Path(jobs) / clip / "job.json").read_text())
         n = job["n_orig"]
         ref_dir = Path(s1_root) / clip / "ref"
-        stride = int(json.loads((ref_dir / "stage1.json").read_text())["args"]["stride"])
-        mdir = ref_dir / "sparse" / "0"
+        ref_res = json.loads((ref_dir / "stage1.json").read_text())
+        stride = int(ref_res["args"]["stride"])
+        mdir = Path(ref_res.get("model_dir") or ref_dir / "sparse" / "0")     # the largest model of the reference run (not always sparse/0)
+        if not mdir.is_dir():
+            mdir = ref_dir / "sparse" / mdir.name
         cams, fr = ref_frames(mdir, stride)
         rec = pycolmap.Reconstruction(str(mdir))
         P = np.array([p.xyz for p in rec.points3D.values()])

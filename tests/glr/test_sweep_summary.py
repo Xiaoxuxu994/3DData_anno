@@ -16,15 +16,18 @@ REPO = Path(__file__).resolve().parents[2]
 HAS_PYCOLMAP = importlib.util.find_spec("pycolmap") is not None
 
 
-def make_run(root, clip, run, c2w, K, names, stride, planar=0.0, cam="PINHOLE", scale=1.0, reuse=None):
+def make_run(root, clip, run, c2w, K, names, stride, planar=0.0, cam="PINHOLE", scale=1.0, reuse=None, best="0", n_img=None):
+    """best != "0": the largest model sits at sparse/<best> (as the incremental mapper writes it) and sparse/0 is a tiny decoy; n_img: images in the database"""
     d = Path(root) / clip / run
-    _fix.write_text_model(d / "sparse" / "0", c2w, K, 640, 360, _fix.scene_points(12000), names, cam=cam, scale=scale)
-    _fix.write_db(d / "database.db", len(c2w), planar_frac=planar)
+    _fix.write_text_model(d / "sparse" / best, c2w, K, 640, 360, _fix.scene_points(12000), names, cam=cam, scale=scale)
+    if best != "0":
+        _fix.write_text_model(d / "sparse" / "0", c2w[:2], K, 640, 360, _fix.scene_points(12000), names[:2], cam=cam, scale=scale)
+    _fix.write_db(d / "database.db", n_img or len(c2w), planar_frac=planar)
     args = {"stride": stride}
     if reuse:
         args["reuse_db"] = str(reuse)
-    (d / "stage1.json").write_text(json.dumps({"args": args, "model": G.summarize_model(d / "sparse" / "0"), "db": G.summarize_db(d / "database.db"),
-                                               "timing_s": {"map": 1.0}, "n_models": 1}, default=float))
+    (d / "stage1.json").write_text(json.dumps({"args": args, "model": G.summarize_model(d / "sparse" / best), "db": G.summarize_db(d / "database.db"),
+                                               "timing_s": {"map": 1.0}, "n_models": 1 if best == "0" else 2, "model_dir": str(d / "sparse" / best)}, default=float))
     return d
 
 
@@ -51,6 +54,12 @@ class SweepSummary(unittest.TestCase):
             K3 = K.copy()
             K3[1, 1] = 555.0                                                              # fx right, fy +11 %: fx / fy = 0.901 stays under the gate's 10 % rule
             make_run(root, "good", "v0a_hq960", traj[f3], K3, nm(f3), 3, reuse=a)
+            # a clip whose reference has the largest model at sparse/1 (sparse/0 is a 2-image decoy): ATE must still be computed over the common frames
+            make_run(root, "second", "ref", traj[f6], K, nm(f6), 6, cam="SIMPLE_PINHOLE", best="1")
+            make_run(root, "second", "v0a", traj[f3], K, nm(f3), 3)
+            # a clip whose reference failed (registered 4 of its 10 frames): its runs must not be scored against it
+            make_run(root, "refbad", "ref", traj[f6][:4], K, nm(f6)[:4], 6, cam="SIMPLE_PINHOLE", n_img=len(f6))
+            make_run(root, "refbad", "v0a", traj[f3], K, nm(f3), 3)
             out = Path(td) / "out"
             pool = Path(td) / "pool" / "good"
             pool.mkdir(parents=True)
@@ -59,7 +68,16 @@ class SweepSummary(unittest.TestCase):
                                capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stderr)
             with open(out / "sweep_runs.csv") as fh:
-                rows = {x["run"]: x for x in csv.DictReader(fh)}
+                allrows = list(csv.DictReader(fh))
+            rows = {x["run"]: x for x in allrows if x["clip"] == "good"}
+            sec = {x["run"]: x for x in allrows if x["clip"] == "second"}
+            bad = {x["run"]: x for x in allrows if x["clip"] == "refbad"}
+            self.assertEqual(sec["v0a"]["n_common"], "10")                                     # the 10-image model at sparse/1, not the 2-image decoy at sparse/0
+            self.assertLess(float(sec["v0a"]["ate_vs_ref_pct"]), 0.01)
+            self.assertEqual(sec["v0a"]["outcome"], "true_pass")
+            self.assertEqual(bad["v0a"]["ref_failed"], "True")                                 # reference registered 4 / 10: no outcome for the run
+            self.assertEqual(bad["v0a"].get("outcome", ""), "")
+            self.assertEqual(bad["v0a"].get("silver_accurate", ""), "")
             self.assertAlmostEqual(float(rows["v0a"]["focal_err_pct"]), 0.0, places=3)
             self.assertLess(float(rows["v0a"]["ate_vs_ref_pct"]), 0.01)                   # scale-free: 0.37 x SfM scale does not matter
             self.assertEqual(rows["v0a"]["silver_accurate"], "True")
