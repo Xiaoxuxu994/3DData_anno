@@ -376,9 +376,10 @@ def build(a):
     gal_c = "".join(card(c) for c in ctl)
     tbl_master = table(["片段", "类型", "视差指数", "规则", "VLM", "关口 v0a", "关口标志", "f/W 复刻", "f/W 银参考", "焦距差 %", "ATE %", "结局"],
                        [master_row(c) for c in easy + ctl], "tall", "视差指数 = 旋转模型残差 / 光流（纯摇镜 ≤ 0.06，有真视差 ≥ 0.8）。焦距差取 fx、fy 中较差的一个。结局只在银参考成功时给出。")
-    demo_tbl = (table(["片段", "路由", "第一阶段关口", "worker 状态", "分级", "最终标签来源", "原因"],
-                      [[esc(d.get(k, "")) for k in ("clip", "route", "gate", "status", "tier", "final", "why")] for d in demo], "",
-                      "稠密深度和证人是替身（见限制）：这张表说明各段接得上、关口和质检规则按预期反应，不说明标签精度。")
+    demo_tbl = (table(["片段", "路由", "关口", "worker", "v1c", "kdis (°)", "xdepth_k", "分级", "最终", "原因"],
+                      [[esc(d.get(k, "")) for k in ("clip", "route", "gate", "status", "v1c", "kdis", "xdepth_k", "tier", "final", "why")] for d in demo], "",
+                      "稠密深度和证人是替身（见限制），v1.3 一侧没有标签所以没有回退：这张表说明各段接得上、关口和质检规则按预期反应，不说明标签精度。"
+                      "v1c &gt; 1 就拒绝；mk_43622 的 xdepth_k 来自两次不同的稀疏点插值（替身深度对替身证人），不是标签质量的结论。")
                 if demo else '<p class="pending">联调演示还没跑完。</p>')
     st = stats
     rev = st.get("review", {})

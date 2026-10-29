@@ -39,8 +39,14 @@ def summarize(out):
         fin = ""
         if f:
             fin = f"{f.get('annotator')} ({f.get('tier')})" if f.get("accept") in ("True", "true", "1") else "拒绝"
+        try:
+            q = json.loads((out / "qc_glr" / f"{clip}.json").read_text())
+        except (OSError, ValueError):
+            q = {}
+        fmt = lambda k, nd: f"{q[k]:.{nd}f}" if isinstance(q.get(k), (int, float)) else ""  # noqa: E731
         rows.append({"clip": clip, "route": rt.get("route", "") + ((" (" + rt["reasons"] + ")") if rt.get("reasons") else ""), "gate": w.get("gate", ""),
-                     "status": w.get("status", ""), "tier": g.get("tier", ""), "final": fin, "why": (f.get("reason") or g.get("reasons") or "")[:160]})
+                     "status": w.get("status", ""), "v1c": fmt("v1c", 2), "kdis": fmt("kdis", 1), "xdepth_k": fmt("xdepth_k", 2), "tier": g.get("tier", ""), "final": fin,
+                     "why": (f.get("reason") or g.get("reasons") or "")[:160]})
     return rows
 
 
