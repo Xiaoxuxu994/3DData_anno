@@ -318,6 +318,7 @@ def build(a):
     f_ctl = [fun[c] for c in ids_c if c in fun]
     fe_pass = sum(1 for r in f_easy if r["first_stop"] in ("gate", "passed_all", "incomplete") and r["rules"] != "stop" and r["vlm"] != "stop")
     fc_caught = sum(1 for r in f_ctl if r["first_stop"] in ("rules", "vlm", "route", "gate"))
+    single = [r["clip"] for r in f_ctl if r.get("n_layers_stopping") == "1"]
     t_easy_par = [par[c]["rot_p90_over_flow_med"] for c in ids_e if c in par and par[c].get("rot_p90_over_flow_med") is not None]
     pans = [par[c]["rot_p90_over_flow_med"] for c in ("ctl_pan_4448", "mk_3110") if c in par and par[c].get("rot_p90_over_flow_med") is not None]
 
@@ -406,7 +407,7 @@ def build(a):
 <div class="find">
 <div><strong>1 · “简单”的网络视频，第一阶段并不容易过。</strong>复刻的第一阶段给出模型的 {len(e_model)} 条里，{len(e_pass)} 条过关口；其余被 <code>fx_fy_mismatch</code>（fx 与 fy 差 &gt; 10 %）、每图点数太少、平面对占比高或没出模型挡住。位姿本身大多是准的：与银参考比，{n_ate_ok} / {len(ate)} 条的 Sim(3) ATE ≤ 3.27 %。</div>
 <div><strong>2 · 主要风险是内参 K，不是轨迹。</strong>自由焦距的 PINHOLE 在前进镜头、远景航拍上焦距几乎不可观测：{n_f10} / {len(fe)} 条的焦距与银参考差 &gt; 10 %，其中 {n_silent} 条还通过了关口（静默错误），v1c 的 K 容差（HFOV 13.2°，约 25 % 焦距）也不会拦。这和评估会话里的 KITTI / 无人机结论一致。</div>
-<div><strong>3 · 前端和关口是互补的两层。</strong>规则 + VLM 挡掉纯摇镜、静止、夜景、切镜、人群；开车类片段 VLM 判“可重建”，由路由送去 v1.3；第一阶段关口再兜住前端漏掉的退化（{len(c_stop)} / {len(c_rows)} 条对照被它 stop）。混入的 1 条淡水印（ia_telangana）规则和 VLM 都没看见。</div>
+<div><strong>3 · 前端和关口是互补的两层。</strong>规则 + VLM 挡掉纯摇镜、静止、夜景、切镜、人群；开车类片段 VLM 判“可重建”，由路由送去 v1.3；第一阶段关口再兜住前端漏掉的退化（{len(c_stop)} / {len(c_rows)} 条对照被它 stop）。{len(f_ctl) - len(single)} / {len(f_ctl)} 条对照被至少两层独立挡住；只靠一层的是 {', '.join(single) if single else '（无）'}（鱼眼，只有 VLM 拦住）。混入的 1 条淡水印（ia_telangana）规则和 VLM 都没看见。</div>
 <div><strong>4 · 管线接通了，并且按“查不出就拒绝”设计。</strong>路由 → 作业包 → worker（关口先于 RoMa / PDA）→ 收集 → 质检分级 → 合并 / 回退 v1.3，在真实片段上贯通；任何一环失败、缺证据、缺深度都变成拒绝，不会悄悄出标签。</div>
 <div><strong>5 · 没做、也做不了的。</strong>没有跑真实 GLRMap、RoMa、PDA、ViPE、Pi3X；证人质检只有接线测试。第二轮独立评审因预算停止。这些都在“下一步”里给了服务器上的执行清单。</div>
 </div></section>

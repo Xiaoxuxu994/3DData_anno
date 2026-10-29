@@ -91,7 +91,7 @@ class Funnel(unittest.TestCase):
                 rows = {x["clip"]: x for x in csv.DictReader(fh)}
             self.assertEqual(rows["easy_a"]["first_stop"], "passed_all")
             self.assertEqual(rows["easy_b"]["first_stop"], "vlm")                       # the filter layers come first; the router only repeats their reject
-            self.assertEqual(rows["easy_b"]["n_layers_stopping"], "3")
+            self.assertEqual(rows["easy_b"]["n_layers_stopping"], "2")                  # vlm + gate: the router's 'reject' only repeats the filter's decision
             self.assertEqual(rows["ctl_d"]["first_stop"], "gate")
             self.assertEqual(rows["ctl_d"]["n_layers_stopping"], "1")
             self.assertEqual(rows["ctl_e"]["first_stop"], "route")                      # sent to v1.3 (driving): known without any stage-1 result
@@ -100,7 +100,8 @@ class Funnel(unittest.TestCase):
             md = (out / "funnel.md").read_text()
             self.assertIn("**easy** (2 clips): first stopped by rules 0, by the VLM 1, sent to the v1.3 annotator by the router 0, by the stage-1 gate 0; passed all 4 layers 1", md)
             self.assertIn("**control_negative** (4 clips): first stopped by rules 2, by the VLM 0, sent to the v1.3 annotator by the router 1, by the stage-1 gate 1; passed all 4 layers 0.", md)
-            self.assertIn("Stopped by exactly one layer: rules 0, VLM 0, router 1, gate 1.", md)
+            self.assertIn("Stopped by exactly one layer: rules 1, VLM 0, router 1, gate 1.", md)
+            self.assertEqual(rows["ctl_c"]["n_layers_stopping"], "2")                   # rules + gate (the router's reject is not a third layer)
 
     @unittest.skipUnless(HAS_MPL, "matplotlib not installed")
     def test_figure_is_written(self):

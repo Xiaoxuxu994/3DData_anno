@@ -515,7 +515,7 @@ review labels), commercial-licence depth/pose model.
 ### E15 results (sandbox, CPU; `docs/GLR_E15_summary.html`, tables in `docs/experiments/tables/E15_*.md`)
 - **Front end** (`filter/s1-s5` unchanged on CPU + the labelled Claude VLM surrogate, two judges per anonymised contact sheet, 32 / 34 agree; optical flow only for
   13 clips): easy 17 / 18 pass (`px_19834200` is rejected by `static_text_area` - the lit-corridor false positive of KNOWN_ISSUES 9); 16 / 16 controls are kept out
-  of GLR (rules 4, VLM 9, router 3 driving clips sent to v1.3); every control is stopped by at least two layers. The faint watermark of `ia_telangana`
+  of GLR (rules 4, VLM 9, router 3 driving clips sent to v1.3); 15 / 16 controls are stopped by at least two independent layers (the router's reject of a filter-rejected clip is not counted as a layer); the one that rests on a single layer is the fisheye clip `ctl_misc_14774` (VLM only, the stage-1 gate lets it through). The faint watermark of `ia_telangana`
   (~0.5 % of the frame) is seen by neither the rules nor the VLM.
 - **Stage-1 gate on the replica (v0a)**: easy 7 ok / 11 stop (`fx_fy_mismatch` 7, no model 2, points per image 2, planar pairs 1); controls 15 stop / 1 ok
   (the fisheye clip). The 2 clips without a model (`mk_5290`, `px_4072162`) stay without a model at 960 px for `mk_5290`; `px_4072162` gets a model at 960 px

@@ -53,7 +53,8 @@ def build(decisions, sweep, manifest, run="v0a", route=None):
         row["gate"] = ("" if g is None else "stop" if g["verdict"] == "stop" else "pass")
         row["gate_verdict"] = (g or {}).get("verdict", "")
         row["gate_flags"] = (g or {}).get("flags", "") or ""
-        row_layer_route = "" if rt is None or not row["route"] else "pass" if row["route"] == "glr" else "stop"
+        # the router only adds information for clips the filter let through: route 'reject' repeats a rules / VLM stop (not an independent layer), 'v13' is a real stop of the GLR track
+        row_layer_route = "" if rt is None or not row["route"] else "stop" if row["route"] == "v13" else "pass"
         layer = {"rules": row["rules"], "vlm": row["vlm"], "route": row_layer_route, "gate": row["gate"]}
         used = [k for k in LAYERS if k != "route" or rt is not None]
         stops = [k for k in used if layer[k] == "stop"]
@@ -72,7 +73,7 @@ def summarize(rows):
             continue
         c = Counter(r["first_stop"] for r in rs)
         has_route = any(r["route"] for r in rows)
-        alone = Counter(next(k for k in LAYERS if (r[k] == "stop" if k != "route" else r["route"] not in ("", "glr"))) for r in rs if r["n_layers_stopping"] == 1)
+        alone = Counter(next(k for k in LAYERS if (r[k] == "stop" if k != "route" else r["route"] == "v13")) for r in rs if r["n_layers_stopping"] == 1)
         out.append(f"**{role}** ({len(rs)} clips): first stopped by rules {c['rules']}, by the VLM {c['vlm']}, "
                    + (f"sent to the v1.3 annotator by the router {c['route']}, " if has_route else "") + f"by the stage-1 gate {c['gate']}; "
                    f"passed all {4 if has_route else 3} layers {c['passed_all']}" + (f"; incomplete (a layer has no result yet) {c['incomplete']}" if c["incomplete"] else "")
