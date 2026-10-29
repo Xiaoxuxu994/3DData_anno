@@ -116,3 +116,18 @@ GPU, half frame rate for slow categories) are in `outputs/evolution/cost.csv`; t
   (C-group recall 0.79 instead of 0.88, see `code/filter/README.md`).
 - Inputs longer than 12 s are cut to the first `--max-frames` frames (180 = 12 s at 15 fps) when decoded from video;
   frame directories are used in full.
+
+## GLR track (GLRMap annotator behind the same filter and QC)
+
+`run_batch_glr.sh` runs `run_batch.sh` unchanged (filter, ViPE, K sources, Pi3X label, v1c QC), then routes the clips that passed the filter
+(`glr_prepare.py`: static scene + real parallax -> GLRMap, otherwise v1.3), hands GLRMap a job package per clip (`glr_worker.sh`, with a stage-1 exit
+gate between SfM and the dense stages), converts the result to the label contract and checks it with the same witnesses (`glr_collect.py`: v1c with the
+GLRMap label, tiers T1/T2/T3) and finally picks one label per clip with a fallback to the v1.3 label (`glr_merge.py`). Outputs sit next to the v1.3
+ones (`labels_glr/`, `qc_glr/`, `results_glr.csv`, `final/`). Status, contracts, rules compliance and the first-run checklist: `docs/GLR_INTEGRATION.md`.
+
+```bash
+code/pipeline/run_batch_glr.sh outputs/my_glr_batch a.mp4 b.mp4 ... --phase=a      # filter + v1.3 + route + job packages (H200 host)
+GLRMAP_HOME=... PY_GLR=... GLR_TASKSET=0-7 code/pipeline/glr_worker.sh outputs/my_glr_batch/glr_jobs/<clip>   # GLRMap host
+code/pipeline/run_batch_glr.sh outputs/my_glr_batch --phase=c                      # collect, QC, final selection
+```
+

@@ -20,6 +20,10 @@
 | `docs/` | 架构、代码地图、权重与数据、已知问题、实验记录 | |
 | `docker/` | 开发容器：`run_dev.sh`（重建容器）、`Dockerfile.vipe`（镜像） | |
 | `tools/relocate.py` | 把脚本里的原根路径换成新根路径 | |
+| `pipeline/glr_*.py`、`glr_worker.sh`、`run_batch_glr.sh` | GLR 轨道：筛选路由 + GLRMap 打标 + 跨模型质检 + 回退（不改 v1.3 脚本）；详见 `docs/GLR_INTEGRATION.md` | 新增，未在真实 GLRMap 上验证 |
+| `tools/glr_gate_replay.py`、`stage1_sfm.py`、`filter_stage_cpu.py` | 第一阶段关口离线回放、pycolmap 复刻的 GLRMap 第一阶段（消融用）、无 GPU 机器上原样跑筛选 stage | 工具 |
+| `tests/glr/` | GLR 轨道单元测试（`python -m unittest discover -s tests/glr`） | 改 GLR 代码后必跑 |
+| `configs/pipeline_glr_v0.yaml` | GLR 轨道的阈值（预注册起始值，未校准） | |
 
 ## 路径约定
 
