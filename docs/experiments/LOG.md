@@ -486,8 +486,13 @@ review labels), commercial-licence depth/pose model.
   `configs/pipeline_glr_v0.yaml`, `tests/glr/` (design and contracts: `docs/GLR_INTEGRATION.md`; server runbook for what the sandbox cannot do:
   `docs/GLR_PHASE0_RUNBOOK.md`). Sandbox-only helpers: `tools/stage1_sfm.py` (pycolmap replica of GLRMap stage 1), `tools/filter_stage_cpu.py`,
   `tools/fetch_ood_set.py`, `evolution/E15_glr/` (stand-ins for the dense stage and the witnesses, demo driver, sweep analysis).
-- Clip set: 15 easy web-style clips (Mixkit / Pexels / Internet Archive; a static scene seen by a moving camera, 12 s) and 15 hard negative
-  controls (static camera, pan only, driving, night, crowd, misc.), recipe and licences in `docs/experiments/E15_ood_manifest.json`.
+- Clip set (`docs/experiments/E15_ood_manifest.json`, recipe, sha256 and licences per clip; rebuilt by `tools/fetch_ood_set.py`): 18 easy web-style clips
+  (7 Mixkit, 4 Pexels, 3 Internet Archive, 4 U.S. National Park Service B-roll; a static scene seen by a moving camera, 12 s, 15 fps) and 11 hard negative
+  controls (static camera, pan only, driving, near-static night, dark, crowd, hard cuts; 4 of them are "spares" kept for one control per type). 5 more
+  controls with a personal-use-only licence were run locally and are not in the manifest. The 12 Mixkit / Pexels easy clips were verified by two
+  independent agents each (visual + provenance); that check moved `mk_3110` to the controls (rotation-only pan), found the faint watermark of
+  `ia_telangana`, and showed that the "no creator credited" author field of 39 Mixkit records was wrong (re-read from the item pages for the clips used).
+  The IA and NPS clips and all controls were assessed by the sourcing agent only (the verification workflow was stopped for budget).
 - Pre-declared definitions for the sandbox sweep (replica of GLRMap stage 1 at reduced cost: 640 px long side, 60 frames = every 3rd frame of the
   15 fps clip, sequential matching overlap 12, unguided; the silver reference = every 6th frame, exhaustive matching, SIMPLE_RADIAL, incremental
   mapper):
