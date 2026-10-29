@@ -60,9 +60,9 @@
 
 （沙箱测试结果表在 §7，跑完后填入。）
 
-**已验证（沙箱，合成数据 + 真实 COLMAP 模型读写）**：路由与抽帧规则；第一阶段关口规则（评估会话里的 KITTI / 无人机 / 室内 / 东京 / Ahlbeck 的数值作回归夹具）；模型和数据库读取（`load_cameras` 与输入相机逐元素一致）；E3b 米制尺度恢复；v1c 三项、`jump60`、`fov_out`、第一阶段 stop/suspect 的分级逻辑；worker 的 split / mono / dry-run / 不覆盖 / 退出码；配置文件与默认值一致。
+**已验证（沙箱，合成数据 + 真实 COLMAP 模型读写，`tests/glr/` 128 项）**：路由与抽帧规则（含无光流统计、长/短片段时的帧数窗口）；第一阶段关口规则（评估会话里的 KITTI / 无人机 / 室内 / 东京 / Ahlbeck 的数值作回归夹具；竖屏焦距规则；关口自身失败 → `error`，不会被读成 ok）；模型和数据库读取（`load_cameras` 与输入相机逐元素一致；路径里带 `#`、`?`、`%` 的数据库）；E3b 米制尺度恢复，以及**被复制的数值代码与原始脚本逐项对拍**（`test_fidelity.py`：`umeyama` / `traj_pct` / `depth_cmp` / `to_grid` / E9 旗标 / `qc_grid` / E3b 从原文件用 `ast` 抽出来比较）；v1c 三项、`jump60`、`fov_out`、关口 stop/suspect/error/缺失、深度缺失/覆盖不足、尺度无证据的分级逻辑；worker 的 split / mono / dry-run / 不覆盖 / 退出码 / 恶意片段名 / SIGTERM 停整组进程 / `taskset`+`timeout` 覆盖整个命令模板 / `RESULT_DIR` 最后写；编排脚本的各阶段、`--gpus` 转发、失败汇总与重跑、`--dry-run` 零写入；merge 的软链接随判定改指；配置文件与默认值一致。
 
-**未验证**：真实 GLRMap 命令行与输出布局（`result.json` 的 `found` 字段会列出实际找到的文件，用来核对）；PDA 融合深度的文件命名和键；ViPE / DA3 证人在 GLR 标签上的阈值是否合适（沿用 v1.3 的样本内阈值）；路由阈值；`conf` 目前只有“深度是否有限”，没有 PDA 距离置信（评估报告的 Phase 1.4）；GLR 与 v1.3 的失败是否真的互补；回归测试 `tests/regression_A.sh`（没有改任何现有脚本，但按 AGENTS.md 第 9 节仍应在服务器上跑一次）。
+**未验证**：真实 GLRMap 命令行与输出布局（`result.json` 的 `found` / `gate_model` 字段会列出实际找到的文件，用来核对）；PDA 融合深度的文件命名和键（布局猜错时每段以 `depth_missing` 被拒并回退 v1.3，不会悄悄产出无深度标签）；ViPE / DA3 证人在 GLR 标签上的阈值是否合适（沿用 v1.3 的样本内阈值）；路由阈值；`conf` 目前只有“深度是否有限”，没有 PDA 距离置信（评估报告的 Phase 1.4）；GLR 与 v1.3 的失败是否真的互补；回归测试 `tests/regression_A.sh`（没有改任何现有脚本，但按 AGENTS.md 第 9 节仍应在服务器上跑一次）；`glr_collect.load_witnesses` 只用替身模块测过接线（真实的 `eval3d_bench` / `qc_common` 需要 OpenEXR 和服务器上的 bench 目录）。
 
 ## 6. 第一次在服务器上跑：核对清单
 
