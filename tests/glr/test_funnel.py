@@ -70,9 +70,37 @@ class Funnel(unittest.TestCase):
             self.assertEqual(rows["ctl_d"]["category"], "no_parallax_rotation")     # controls are grouped by the failure they were chosen for
             self.assertEqual(rows["easy_a"]["category"], "drone_orbit")
             md = (out / "funnel.md").read_text()
-            self.assertIn("**easy** (2 clips): first stopped by rules 0, by the VLM 1, by the stage-1 gate 0; passed all three 1", md)
-            self.assertIn("**control_negative** (4 clips): first stopped by rules 2, by the VLM 0, by the stage-1 gate 1; passed all three 0; incomplete", md)
+            self.assertIn("**easy** (2 clips): first stopped by rules 0, by the VLM 1, by the stage-1 gate 0; passed all 3 layers 1", md)
+            self.assertIn("**control_negative** (4 clips): first stopped by rules 2, by the VLM 0, by the stage-1 gate 1; passed all 3 layers 0; incomplete", md)
             self.assertIn("Stopped by exactly one layer: rules 1, VLM 0, gate 1.", md)
+
+    def test_router_is_a_layer_and_v13_is_not_a_rejection_of_the_clip_by_the_filter(self):
+        route = [("easy_a", "glr", ""), ("easy_b", "reject", "filter"), ("ctl_c", "reject", "filter"), ("ctl_d", "glr", ""), ("ctl_e", "v13", "vlm_driving"),
+                 ("ctl_f", "reject", "filter")]
+        with tempfile.TemporaryDirectory() as td:
+            write(td)
+            with open(Path(td) / "glr_route.csv", "w", newline="") as fh:
+                w = csv.writer(fh)
+                w.writerow(["clip", "route", "reasons"])
+                w.writerows(route)
+            out = Path(td) / "out"
+            r = subprocess.run([sys.executable, str(SCRIPT), str(Path(td) / "decisions.csv"), str(Path(td) / "sweep_runs.csv"), str(out), "--manifest",
+                                str(Path(td) / "manifest.json"), "--route", str(Path(td) / "glr_route.csv"), "--no-figure"], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            with open(out / "funnel.csv") as fh:
+                rows = {x["clip"]: x for x in csv.DictReader(fh)}
+            self.assertEqual(rows["easy_a"]["first_stop"], "passed_all")
+            self.assertEqual(rows["easy_b"]["first_stop"], "vlm")                       # the filter layers come first; the router only repeats their reject
+            self.assertEqual(rows["easy_b"]["n_layers_stopping"], "3")
+            self.assertEqual(rows["ctl_d"]["first_stop"], "gate")
+            self.assertEqual(rows["ctl_d"]["n_layers_stopping"], "1")
+            self.assertEqual(rows["ctl_e"]["first_stop"], "route")                      # sent to v1.3 (driving): known without any stage-1 result
+            self.assertEqual(rows["ctl_e"]["route_reason"], "vlm_driving")
+            self.assertEqual(rows["ctl_f"]["first_stop"], "rules")
+            md = (out / "funnel.md").read_text()
+            self.assertIn("**easy** (2 clips): first stopped by rules 0, by the VLM 1, sent to the v1.3 annotator by the router 0, by the stage-1 gate 0; passed all 4 layers 1", md)
+            self.assertIn("**control_negative** (4 clips): first stopped by rules 2, by the VLM 0, sent to the v1.3 annotator by the router 1, by the stage-1 gate 1; passed all 4 layers 0.", md)
+            self.assertIn("Stopped by exactly one layer: rules 0, VLM 0, router 1, gate 1.", md)
 
     @unittest.skipUnless(HAS_MPL, "matplotlib not installed")
     def test_figure_is_written(self):
