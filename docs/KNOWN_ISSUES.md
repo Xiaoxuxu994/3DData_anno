@@ -46,3 +46,11 @@
 - 所有 GLR 阈值（路由、关口、分级）是预注册的起始值；Phase 0 要在已有的第一阶段输出上用 `tools/glr_gate_replay.py` 回放，达不到通过线就不让 GLRMap 上网络视频。
 - 证人（ViPE、Pi3X ≈ 0.65% ATE）比 GLRMap 好的时候（0.05–0.2%）噪声大，v1c 只能抓约 3% 以上的粗错；分级 T1/T2 不等于精确。
 - GLR 与 v1.3 的失败机制是否互补只是假设（回退策略依赖它），要在同一批有真值片段上同时跑两条线来验证。
+
+## 9. 筛选 OCR 阶段（`filter/s3_ocr.py`）的文本框面积在 int16 下溢出
+
+- 在 `envs/ocr-venv.txt` 锁定的版本（paddleocr 3.7.0 / paddlepaddle 3.3.1 / paddlex 3.7.2）下，`TextDetection(...).predict(img)[0]["dt_polys"]` 的 dtype 是 **int16**；`(x1 - x0) * (y1 - y0)` 在 int16 标量下，框大于约 181×181 像素（面积 > 32767）就溢出（numpy 报 `overflow encountered in scalar multiply`）。例：1920×1080 帧里多边形 `[[717,190],[1281,217],[1271,418],[707,390]]` 算出 −200，真值 130872。
+- 影响 `scores.json["ocr"]` 里的 `text_area_max / text_area_mean / bottom_band_area / corner_area`（`static_text_area` 走 `cv2.fillPoly` 的 int32 多边形，不受影响）。`decide.py` 的 `text_overlay` 规则里 `ocr.text_area_max > 0.3` 这一半，对恰好最该抓的大字幕 / 大叠字会少报甚至不触发。
+- 沙箱里 12 条 DL3DV 难度片段的实测：2 条受影响，`text_area_max` 原样 0.0143 / 0.0619，改成 float 后 0.0972 / 0.1273（都没超过 0.3，所以决策不变）；其余片段没有大框，两种算法一致（`/tmp` 里的复核脚本见 docs/experiments/LOG.md E15）。
+- 建议（未改，因为会改变已记录的筛选分数和可能的决策）：在循环里先 `p = p.astype(np.float64)`；在 C 组上对修复前后的 `text_area_*` 和 `decide.py` 决策做对比，写进 LOG 再决定要不要动 0.3 / 0.02 两个阈值。
+- 顺带观察：`static_text_area > 0.02` 会误拒“前进运动 + 画面中央有一排亮窗”的片段（沙箱里教堂走廊那条：没有任何字幕或水印，三帧的中央窗户排被检成文字框，交集 2.7%）。前进镜头的远处结构在图像里位置基本不动，和“烧进画面的静态叠字”在这个统计量上很像；DL3DV 式前进 / 绕拍场景里可能系统性出现。
