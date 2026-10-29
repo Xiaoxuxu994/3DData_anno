@@ -79,6 +79,22 @@ OMP_NUM_THREADS=1 $ROOT/cache/qc-venv/bin/python code/viz/export_ply.py  [--work
 - 两个脚本渲染的是脚本内置的示例片段表（读实验目录 `outputs/bench/<组>/pi3x_kgate` 等），四宫格：RGB / 深度 / 俯视轨迹 / 点云。
 - 要可视化 `pipeline/` 的新结果，需要在脚本的片段表里加条目，或按 `OUT/labels/<clip>.npz` 的格式（第 5 节）改写读取部分；改写时复制一份，不要改原脚本（规则 6）。
 
+### 4.5 GLR 轨道（实验性，E15；未在真实 GLRMap 上验证）
+
+GLRMap（SfM + RoMa + PDA）接在 v1.3 的筛选和质检之间，失败时回退 v1.3 标签。设计、契约、第一次上机的核对清单见 `docs/GLR_INTEGRATION.md`，服务器上才能做的实验见 `docs/GLR_PHASE0_RUNBOOK.md`。
+
+```bash
+code/pipeline/run_batch_glr.sh outputs/<run> a.mp4 b.mp4 ... --phase=a      # H200：筛选 + v1.3 + 路由 + 作业包（--phase=c / --phase=a 不用再给视频）
+GLRMAP_HOME=... PY_GLR=... GLR_TASKSET=0-7 code/pipeline/glr_worker.sh outputs/<run>/glr_jobs/<clip>   # GLRMap 主机（作业包用 rsync -aL 拷过去）
+code/pipeline/run_batch_glr.sh outputs/<run> --phase=c                      # 收集 + 质检 + 合并 → final/{results.csv, labels/}
+python3 -m unittest discover -s code/tests/glr                              # 128 项，不需要 GPU
+```
+
+- **没有 `GLR_TASKSET` 就不要启动 GLRMap**（GLOMAP 无视线程数设置，会占满整机；规则 2）；`--gpus=` 会转给 GLRMap（规则 1），没给就选一张空闲卡。
+- 关口自己出错（verdict `error`）、缺关口文件、缺深度、算不出来的 v1c 分量 / 尺度，一律拒绝，不会被当成通过；T1/T2/T3 只表示“没有触发已知失败特征”，不等于精确。
+- 再跑一次阶段就是续跑：`results_glr.csv`、`qc_glr/`、`labels_glr/`、`final/` 是从 `glr_jobs/<clip>/result*/` 推导出来的视图，会重建；GLRMap 的结果目录和 v1.3 的输出永不覆盖。
+- 阈值（`configs/pipeline_glr_v0.yaml`）是预注册的起始值，别在看过的数据上调它们再宣称通过。
+
 ## 5. 输入输出契约
 
 `OUT/labels/<clip>.npz`（**标签本体**）：

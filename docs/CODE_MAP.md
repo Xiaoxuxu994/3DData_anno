@@ -22,6 +22,8 @@
 | `tools/relocate.py` | 把脚本里的原根路径换成新根路径 | |
 | `pipeline/glr_*.py`、`glr_worker.sh`、`run_batch_glr.sh` | GLR 轨道：筛选路由 + GLRMap 打标 + 跨模型质检 + 回退（不改 v1.3 脚本）；详见 `docs/GLR_INTEGRATION.md` | 新增，未在真实 GLRMap 上验证 |
 | `tools/glr_gate_replay.py`、`stage1_sfm.py`、`filter_stage_cpu.py` | 第一阶段关口离线回放、pycolmap 复刻的 GLRMap 第一阶段（消融用）、无 GPU 机器上原样跑筛选 stage | 工具 |
+| `tools/fetch_ood_set.py` | 按 `docs/experiments/E15_ood_manifest.json` 重新下载并切出 E15 的 OOD 片段（带来源、许可证、sha256） | 工具 |
+| `evolution/E15_glr/` | E15 实验脚本：沙箱演示（稠密阶段 / 证人替身、`run_demo.sh`）、扫描汇总 `summarize_sweep.py`、VLM 替身打分写入、OCR 溢出复核 | 实验（结果见 LOG E15） |
 | `tests/glr/` | GLR 轨道单元测试（`python -m unittest discover -s tests/glr`） | 改 GLR 代码后必跑 |
 | `configs/pipeline_glr_v0.yaml` | GLR 轨道的阈值（预注册起始值，未校准） | |
 
