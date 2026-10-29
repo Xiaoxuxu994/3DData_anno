@@ -21,6 +21,7 @@ RUN=$(realpath "$1") S1_ROOT=$(realpath "$2") OUT=$(realpath -m "$3"); shift 3
 CLIPS=("$@")
 PY=${PY:-python3}; PY_FILTER=${PY_FILTER:-$PY}
 [ ! -e "$OUT" ] || { echo "$OUT exists - the demo writes a new directory"; exit 2; }
+"$PY" "$REPO/evolution/E15_glr/demo_precheck.py" "$RUN/pool" "$S1_ROOT" "${CLIPS[@]}"      # before anything is written: missing inputs abort here
 mkdir -p "$OUT/bench" "$OUT/filter" "$OUT/pool" "$OUT/logs"
 ROOT_TMP=$OUT/.root                       # throw-away ANNO_ROOT so common.sh finds code/ and a python for the QC steps
 mkdir -p "$ROOT_TMP/cache/qc-venv/bin"

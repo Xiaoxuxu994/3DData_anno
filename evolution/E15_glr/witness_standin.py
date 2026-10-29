@@ -94,6 +94,8 @@ def main(s1_root, pool, jobs, out, clips):
             if f in used:
                 da3[f] = d
         s = json.loads((Path(pool) / clip / "scores.json").read_text())
+        if "calib" not in s:
+            sys.exit(f"{clip}: no GeoCalib scores in {Path(pool) / clip / 'scores.json'} - run filter stage s5_geocalib first (the K witness of the stand-in)")
         vf = float(np.median(s["calib"]["vfov_deg"]))
         hfov = float(np.degrees(2 * np.arctan(np.tan(np.radians(vf) / 2) * W / H)))
         np.savez(out / f"{clip}.npz", c2w=c2w, K=np.tile(Kg, (n, 1, 1)), D=D, da3_D=da3, others_med=hfov, vipe_focal_cv=0.0)
