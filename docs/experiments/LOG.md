@@ -476,3 +476,27 @@ review labels), commercial-licence depth/pose model.
   cancel those of ViPE, so voting does not help — the scale problem needs multi-view metric evidence, not another
   monocular voter; (3) the first CPU eval launch (24 workers without thread caps) pushed host load to ~540 — rerun with
   OMP/BLAS threads = 3 and 20 workers (`run_eval.sh`); always cap threads on this shared host.
+
+## E15 — GLR track: GLRMap annotator behind the 3DData_anno filter and QC; sandbox evidence on easy web-style clips (2026-10-29, CPU only)
+(status: running; the criteria below were written before the silver-reference and variant results were looked at)
+- Question: can GLRMap (SfM + RoMa + PDA, non-metric) be put between the v1.3 front end (rules + VLM judge) and the v1.3 back end (cross-witness
+  QC v1c + flags) so that a batch can be run without a human, with v1.3 as the fallback? What can be said without a GPU, without the GLRMap code
+  and without the user's servers?
+- Code: `pipeline/{run_batch_glr.sh, glr_prepare.py, glr_worker.sh, glr_stage1_gate.py, glr_collect.py, glr_merge.py, glr_common.py}`,
+  `configs/pipeline_glr_v0.yaml`, `tests/glr/` (design and contracts: `docs/GLR_INTEGRATION.md`; server runbook for what the sandbox cannot do:
+  `docs/GLR_PHASE0_RUNBOOK.md`). Sandbox-only helpers: `tools/stage1_sfm.py` (pycolmap replica of GLRMap stage 1), `tools/filter_stage_cpu.py`,
+  `tools/fetch_ood_set.py`, `evolution/E15_glr/` (stand-ins for the dense stage and the witnesses, demo driver, sweep analysis).
+- Clip set: 15 easy web-style clips (Mixkit / Pexels / Internet Archive; a static scene seen by a moving camera, 12 s) and 15 hard negative
+  controls (static camera, pan only, driving, night, crowd, misc.), recipe and licences in `docs/experiments/E15_ood_manifest.json`.
+- Pre-declared definitions for the sandbox sweep (replica of GLRMap stage 1 at reduced cost: 640 px long side, 60 frames = every 3rd frame of the
+  15 fps clip, sequential matching overlap 12, unguided; the silver reference = every 6th frame, exhaustive matching, SIMPLE_RADIAL, incremental
+  mapper):
+  - a replica run is **silver-accurate** iff >= 90 % of its frames registered AND |f - f_ref| <= 10 % of f_ref AND Sim(3) ATE to the silver
+    reference (common frames) <= 3.27 % of the reference path (the v1c threshold of E8). The silver reference is a second SfM reconstruction of the
+    same frames, not ground truth: "silver-accurate" means "agrees with an independent exhaustive reconstruction";
+  - a run that passes the stage-1 gate (verdict ok or suspect) but is not silver-accurate is a **silent error**; a run that the gate stops although
+    it is silver-accurate is a **false stop**;
+  - nothing in `configs/pipeline_glr_v0.yaml` is tuned on these clips; the gate thresholds were fixed before any of them was run.
+- Known limitation of the replica (stated up front): it is harsher than the real stage 1 (full resolution, ~100 frames, guided matching), so signals
+  that depend on resolution (points per image, planar-pair fraction) are NOT comparable with the evaluation sessions' numbers; clips that stop on
+  them are rerun at 960 px (`v0a_hq960`) before anything is concluded.
