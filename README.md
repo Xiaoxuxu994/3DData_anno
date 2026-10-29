@@ -49,6 +49,7 @@ bash tests/regression_A.sh                        # 改代码后：A 组回归�
 | `docs/CODE_MAP.md` | 每个目录做什么、哪些是生产代码、路径约定 |
 | `docs/WEIGHTS_DATA.md` | 模型权重、数据集和结果的位置与来源 |
 | `docs/KNOWN_ISSUES.md` | 已知问题与下一步（尺度、内参 E14、阈值校准…） |
+| `docs/GLR_INTEGRATION.md`、`docs/GLR_E15_summary.html` | GLR 轨道（GLRMap 打标接在前端筛选和后端质检之间，实验性）：设计、服务器核对清单、E15 沙箱测试结果页（离线打开） |
 | `docs/experiments/` | 全部实验记录：`LOG.md`（成功和失败都记）、`experiments.csv`、成本模型、各实验的结果表 |
 | `configs/pipeline_v13.yaml` | 当前最佳配置与参考指标 |
 

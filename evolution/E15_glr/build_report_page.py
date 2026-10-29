@@ -330,7 +330,8 @@ def build(a):
         r = v0(c["id"]) or {}
         lic = c.get("license") or ""
         t = None if any(k in lic for k in NO_THUMB) or not a.frames_root else thumb(a.frames_root, c["id"])
-        ph = f'<img src="{t}" alt="{esc(c["id"])} 的第 90 帧" loading="lazy">' if t else f'<span>{esc(lic)}<br>（不展示画面）</span>'
+        lic_txt = "仅限个人使用，只在本地试过" if lic.startswith("Restricted") else lic
+        ph = f'<img src="{t}" alt="{esc(c["id"])} 的第 90 帧" loading="lazy">' if t else f'<span>{esc(lic_txt)}<br>（不展示画面）</span>'
         bs = []
         if r:
             v = r["verdict"]
