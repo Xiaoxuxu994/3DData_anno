@@ -10,7 +10,7 @@ Reads the outputs of tools/stage1_sfm.py laid out as S1_ROOT/<clip>/<run>/{stage
   ref        silver reference: every 6th frame, exhaustive matching, SIMPLE_RADIAL, incremental mapper
 and writes one row per run (signals, gate verdict, agreement with the reference) plus the tables used in docs/experiments/LOG.md (E15).
 Definitions (pre-declared in LOG.md before the reference results were read): a run is `silver_accurate` iff >= 90 % of its frames registered,
-|f/W - f_ref/W| <= 10 % of f_ref/W and the Sim(3) ATE to the reference over the common frames is <= 3.27 % of the reference path. Gate verdict
+|f/W - f_ref/W| <= 10 % of f_ref/W for both fx and fy (the worse of the two) and the Sim(3) ATE to the reference over the common frames is <= 3.27 % of the reference path. Gate verdict
 ok / suspect + not silver-accurate = silent error; gate stop + silver-accurate = false stop. The reference is a second SfM run, not ground truth.
 """
 
@@ -81,7 +81,9 @@ def row_for(clip, run, r, ref):
     if ref is not None and run != "ref":
         fr = (ref["res"].get("model") or {}).get("focal_w")
         if m and fr:
-            row["focal_err_pct"] = 100 * (m["focal_w"] / fr - 1)
+            ex = m["focal_w"] / fr - 1                                          # fx against the reference's single focal ...
+            ey = m["focal_w"] / m["fx_fy"] / fr - 1 if m.get("fx_fy") else ex   # ... and fy (= fx / (fx / fy)): a PINHOLE label is only as good as the worse one
+            row["focal_err_pct"] = 100 * max(ex, ey, key=abs)
         if r["cams"] is not None and ref["cams"] is not None:
             row["ate_vs_ref_pct"], row["n_common"] = ate_pct(r, ref)
         acc = (row["reg_frac"] or 0) >= REG_MIN and abs(row.get("focal_err_pct", np.inf)) <= F_MAX and row.get("ate_vs_ref_pct", np.inf) <= ATE_MAX

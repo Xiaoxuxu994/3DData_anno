@@ -48,6 +48,9 @@ class SweepSummary(unittest.TestCase):
             wrong[:, 1, 3] += 0.5 * np.sin(np.linspace(0, 3 * np.pi, len(f3)))             # a wobble no Sim(3) can absorb
             make_run(root, "good", "v2prior", wrong, K, nm(f3), 3, reuse=a)
             make_run(root, "good", "v0b", traj[f3], K, nm(f3), 3, planar=1.0, scale=2.0, reuse=a)      # accurate but 100 % planar pairs: false stop
+            K3 = K.copy()
+            K3[1, 1] = 555.0                                                              # fx right, fy +11 %: fx / fy = 0.901 stays under the gate's 10 % rule
+            make_run(root, "good", "v0a_hq960", traj[f3], K3, nm(f3), 3, reuse=a)
             out = Path(td) / "out"
             r = subprocess.run([sys.executable, str(REPO / "evolution" / "E15_glr" / "summarize_sweep.py"), str(root), str(out)], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stderr)
@@ -65,6 +68,9 @@ class SweepSummary(unittest.TestCase):
             self.assertGreater(float(rows["v2prior"]["ate_vs_ref_pct"]), 3.27)
             self.assertEqual(rows["v0b"]["verdict"], "stop")
             self.assertEqual(rows["v0b"]["outcome"], "false_stop")
+            self.assertEqual(rows["v0a_hq960"]["verdict"], "ok")                          # a PINHOLE label is only as good as the worse of fx and fy:
+            self.assertAlmostEqual(float(rows["v0a_hq960"]["focal_err_pct"]), 11.0, places=1)
+            self.assertEqual(rows["v0a_hq960"]["outcome"], "silent_error")                # fy is 11 % off although fx is exact
             self.assertEqual(rows["ref"]["outcome"], "")                                   # the reference is not scored against itself
             md = (out / "tables.md").read_text()
             self.assertIn("### A.", md)

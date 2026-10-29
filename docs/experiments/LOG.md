@@ -491,7 +491,8 @@ review labels), commercial-licence depth/pose model.
 - Pre-declared definitions for the sandbox sweep (replica of GLRMap stage 1 at reduced cost: 640 px long side, 60 frames = every 3rd frame of the
   15 fps clip, sequential matching overlap 12, unguided; the silver reference = every 6th frame, exhaustive matching, SIMPLE_RADIAL, incremental
   mapper):
-  - a replica run is **silver-accurate** iff >= 90 % of its frames registered AND |f - f_ref| <= 10 % of f_ref AND Sim(3) ATE to the silver
+  - a replica run is **silver-accurate** iff >= 90 % of its frames registered AND |f - f_ref| <= 10 % of f_ref for both fx and fy (the worse of the
+    two; fixed before any reference result existed) AND Sim(3) ATE to the silver
     reference (common frames) <= 3.27 % of the reference path (the v1c threshold of E8). The silver reference is a second SfM reconstruction of the
     same frames, not ground truth: "silver-accurate" means "agrees with an independent exhaustive reconstruction";
   - a run that passes the stage-1 gate (verdict ok or suspect) but is not silver-accurate is a **silent error**; a run that the gate stops although
