@@ -1,0 +1,86 @@
+[
+ {
+  "clip": "ia_telangana",
+  "route": "glr",
+  "gate": "ok",
+  "status": "complete",
+  "v1c": "0.76",
+  "kdis": "6.3",
+  "xdepth_k": "0.15",
+  "tier": "T2",
+  "final": "glr (T2)",
+  "why": ""
+ },
+ {
+  "clip": "mk_43622",
+  "route": "glr",
+  "gate": "ok",
+  "status": "complete",
+  "v1c": "1.60",
+  "kdis": "1.6",
+  "xdepth_k": "0.31",
+  "tier": "T3",
+  "final": "拒绝",
+  "why": "glr:v1c_gt_1;v13:none"
+ },
+ {
+  "clip": "mk_4206",
+  "route": "glr",
+  "gate": "ok",
+  "status": "complete",
+  "v1c": "0.88",
+  "kdis": "10.8",
+  "xdepth_k": "0.17",
+  "tier": "T2",
+  "final": "glr (T2)",
+  "why": ""
+ },
+ {
+  "clip": "mk_41574",
+  "route": "glr",
+  "gate": "stop",
+  "status": "stopped_at_gate",
+  "v1c": "",
+  "kdis": "",
+  "xdepth_k": "",
+  "tier": "T3",
+  "final": "拒绝",
+  "why": "glr:glr_stopped_at_gate;s1_fx_fy_mismatch;v13:none"
+ },
+ {
+  "clip": "mk_21589",
+  "route": "glr",
+  "gate": "stop",
+  "status": "stopped_at_gate",
+  "v1c": "",
+  "kdis": "",
+  "xdepth_k": "",
+  "tier": "T3",
+  "final": "拒绝",
+  "why": "glr:glr_stopped_at_gate;s1_fx_fy_mismatch;s1_planar_or_panoramic_pairs;v13:none"
+ },
+ {
+  "clip": "ia_victory",
+  "route": "glr",
+  "gate": "suspect",
+  "status": "complete",
+  "v1c": "1.24",
+  "kdis": "16.3",
+  "xdepth_k": "0.14",
+  "tier": "T3",
+  "final": "拒绝",
+  "why": "glr:v1c_gt_1;v13:none"
+ },
+ {
+  "clip": "px_19834200",
+  "route": "reject (filter)",
+  "gate": "",
+  "status": "",
+  "v1c": "",
+  "kdis": "",
+  "xdepth_k": "",
+  "tier": "",
+  "final": "拒绝",
+  "why": "filter:text_overlay"
+ }
+]

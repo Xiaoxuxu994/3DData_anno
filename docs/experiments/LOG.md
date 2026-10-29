@@ -523,11 +523,13 @@ review labels), commercial-licence depth/pose model.
 - **Against the silver reference** (16 scored; the reference failed on `mk_50847`, `gov_grca_hd10_c32a46`): true stop 9, true pass 3, **silent error 4,
   false stop 0**. Poses are mostly right (Sim(3) ATE <= 3.27 % in 11 / 14, median 0.28 %); the focal is not (|error| > 10 % in 11 / 14, median ~43 %).
 - **Variants**: v0b (other mapper seed) reproduces v0a - the focal error is deterministic, repeated runs cannot expose it. v1sp (SIMPLE_PINHOLE): gate pass 13 / 16 but
-  only 3 silver-accurate, **silent errors 10** (v0a: 4) - the constraint removes the `fx_fy_mismatch` alarm without fixing the focal. v2prior / v3fixed (GeoCalib
-  focal as start value / fixed): see `E15_sweep_tables.md` table B (only the clips that got GeoCalib in time).
-- **Three-way focal table (post-hoc)**: on the aerial NPS clips replica, silver reference and GeoCalib disagree by factors of 2-4 (reference f/W 0.27-0.38, replica
-  0.9-1.4, GeoCalib 0.83), so a single silver reference cannot arbitrate K; where the replica and GeoCalib agree and the reference differs (`mk_41574`) the reference
-  is the odd one out.
+  only 3 silver-accurate, **silent errors 10** (v0a: 4) - the constraint removes the `fx_fy_mismatch` alarm without fixing the focal. v2prior (GeoCalib focal as
+  start value, still refined; the 14 clips that got GeoCalib): falls back to the same solution as v0a (gate pass 7, silent errors 4, median focal error 41 %), the optimizer
+  discards the prior; v3fixed (GeoCalib focal fixed): gate pass 13 / 14, silver-accurate 6 / 14, silent errors 7, median focal error 11 % (that number is GeoCalib against the
+  reference) - the best variant here, but its "agreement" is only agreement with a second reconstruction and a single-image prior.
+- **Three-way focal table (post-hoc, 14 clips, 10 % tolerance)**: all three agree on 2; where exactly two agree it is silver reference = GeoCalib 5 times, replica =
+  reference once, replica = GeoCalib never; no two agree on 6. The free-focal replica is the least reliable of the three. On the aerial NPS clips the three disagree by
+  factors of 2-4 (reference f/W 0.27-0.38, replica 0.9-1.4, GeoCalib 0.83), so a single silver reference cannot arbitrate K there either.
 - **Demo** (`run_demo.sh`, 7 clips, stand-in dense stage and witnesses, no v1.3 fallback): 2 T2 labels (`ia_telangana`; `mk_4206` whose focal is 22 % off still passes
   v1c, kdis 10.8 deg < 13.2), 1 filter reject, 2 gate stops, 2 QC rejects (`ia_victory`: kdis 16.3 deg; `mk_43622`: xdepth_k 0.31 from the two different sparse-point
   interpolations of the stand-ins - an artefact of the stand-ins, not a verdict on the label).

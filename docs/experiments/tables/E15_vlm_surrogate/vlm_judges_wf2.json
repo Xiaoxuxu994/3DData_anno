@@ -1,0 +1,794 @@
+[
+ {
+  "clip": "s00",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "static",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "The camera is locked off on a tripod (foreground rocks and snowy peaks sit at identical pixel positions in all 12 frames) and only the clouds move, so there is no parallax and the main scene is distant mountains.",
+   "confidence": 0.93
+  }
+ },
+ {
+  "clip": "s00",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "static",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "The camera is locked off (the foreground rock and the mountain peak sit at identical pixel positions in all 12 frames) and only the clouds move, so there is no parallax for SLAM/SfM and the scene is a distant snowy mountain with moving sky.",
+   "confidence": 0.92
+  }
+ },
+ {
+  "clip": "s01",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "driving",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Continuous forward-facing drive along a winding autumn forest road with real parallax over a static natural scene, no cuts, overlays or moving objects, only mild edge motion blur.",
+   "confidence": 0.85
+  }
+ },
+ {
+  "clip": "s01",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "driving",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Forward-facing vehicle camera moving continuously along a winding forest road with strong parallax over a static, real, richly textured scene; no cuts, overlays, or moving objects, and only mild peripheral motion blur on near foliage.",
+   "confidence": 0.85
+  }
+ },
+ {
+  "clip": "s02",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_dynamic",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "medium",
+   "camera_motion": "static",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "The camera is fixed on a tripod-style framing of a lit evening street corner (storefronts, signs and pole stay at identical image positions in all 12 frames) while pedestrians walk through, so there is no camera parallax for SfM/SLAM.",
+   "confidence": 0.94
+  }
+ },
+ {
+  "clip": "s02",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_dynamic",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "medium",
+   "camera_motion": "static",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "The camera is locked off (the storefront and signage sit at identical positions in all 12 frames) while pedestrians walk through the lower third of the frame, so there is no parallax for SLAM/SfM.",
+   "confidence": 0.92
+  }
+ },
+ {
+  "clip": "s03",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mixed",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "A drone arcs around a large building under construction, so the viewing angle changes steadily and the static, textured site shows real parallax; haze increases late in the clip but there are no cuts or overlays.",
+   "confidence": 0.78
+  }
+ },
+ {
+  "clip": "s03",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mixed",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "A drone arcs around a static building under construction at moderate range, and the facade angle and background change steadily across frames, which gives real parallax despite some haze.",
+   "confidence": 0.68
+  }
+ },
+ {
+  "clip": "s04",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": true,
+   "reconstructable": "no_inaccurate",
+   "reason": "Night-time city skyline with an almost black foreground and a slow forward walk; the very low light and the distant, nearly parallax-free skyline would make poses and depth unreliable.",
+   "confidence": 0.6
+  }
+ },
+ {
+  "clip": "s04",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "static",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": true,
+   "reconstructable": "no_unreconstructable",
+   "reason": "Night shot of a distant city skyline from a fixed viewpoint, with the skyline and railings in the same place in every frame (no parallax), a near-black foreground and only a few small pedestrians moving.",
+   "confidence": 0.85
+  }
+ },
+ {
+  "clip": "s05",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_rotation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "Upward-looking forest canopy shot where the camera barely moves, only a slow pan or drift of about 10 degrees over 12 s, so there is almost no parallax over dense, repetitive foliage.",
+   "confidence": 0.55
+  }
+ },
+ {
+  "clip": "s05",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "static",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "The camera looks up into a forest canopy from nearly the same spot for all 12 s, with only a slight slow drift, so there is almost no parallax for pose and depth estimation.",
+   "confidence": 0.55
+  }
+ },
+ {
+  "clip": "s06",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_rotation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "A continuous slow pan and tilt across distant snow-capped peaks, where the features shift together with almost no parallax, so poses and metric depth would be degenerate.",
+   "confidence": 0.7
+  }
+ },
+ {
+  "clip": "s06",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_rotation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "A continuous pan with slight tilt reveals distant snow-capped peaks, and foreground and background shift at nearly the same rate, so there is little parallax and the scene is very far away.",
+   "confidence": 0.68
+  }
+ },
+ {
+  "clip": "s07",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "driving",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Continuous forward highway driving with real parallax from the median wall, road-cut slope and guardrails, only small oncoming trucks across the barrier, though strong sun glare ahead and dark low-texture asphalt are a mild risk.",
+   "confidence": 0.72
+  }
+ },
+ {
+  "clip": "s07",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "driving",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Continuous forward-moving highway drive with real parallax from the median barrier, guardrail and hillside, only small trucks on the opposite carriageway, and sun glare ahead that slightly lowers confidence.",
+   "confidence": 0.74
+  }
+ },
+ {
+  "clip": "s08",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "static",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": true,
+   "reconstructable": "no_unreconstructable",
+   "reason": "Sky-only footage of dusk clouds with no foreground, no parallax cues and a fade to near-dark, so there is no usable geometry for SfM or SLAM.",
+   "confidence": 0.85
+  }
+ },
+ {
+  "clip": "s08",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "other",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "medium",
+   "camera_motion": "static",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": true,
+   "reconstructable": "no_unreconstructable",
+   "reason": "Fixed-view dusk time-lapse of far-away drifting clouds with no parallax or static structure, darkening to near black.",
+   "confidence": 0.86
+  }
+ },
+ {
+  "clip": "s09",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mixed",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": true,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "The clip is an edited montage of separate near-static shots (street sign close-up, alley with a gondola, mural street, mural door close-up) with scene changes around 2.7s, 6s and 10s, so continuous SLAM or SfM is not possible.",
+   "confidence": 0.8
+  }
+ },
+ {
+  "clip": "s09",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mixed",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": true,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "The sheet shows a sunlit yellow wall corner, a shaded street with a cable car, a mural street, and a mural door close-up. These are different locations, so the clip is a multi-shot montage with cuts. Each shot has only slow, small camera movement.",
+   "confidence": 0.85
+  }
+ },
+ {
+  "clip": "s10",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "A camera walks forward up a stairway between blue glass railings toward a brick building, giving continuous real parallax over a static, real outdoor scene with no people, cuts or overlays.",
+   "confidence": 0.82
+  }
+ },
+ {
+  "clip": "s10",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "A handheld camera walks forward along an outdoor stairway with blue glass railings, giving strong parallax over a static real scene, with no cuts, overlays or notable moving objects.",
+   "confidence": 0.82
+  }
+ },
+ {
+  "clip": "s11",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": true,
+   "reconstructable": "no_inaccurate",
+   "reason": "Dusk skyline with only a very slow forward drift (parallax is visible only in the dark near-field bollards, cone and wall), a far-dominated scene and a brief passing car, so poses and depth would be unreliable.",
+   "confidence": 0.5
+  }
+ },
+ {
+  "clip": "s11",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "static",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": true,
+   "reconstructable": "no_unreconstructable",
+   "reason": "Near-locked-off night shot of high-rises behind a wall, with only slight drift (no usable parallax) and one brief passing car, in low light.",
+   "confidence": 0.62
+  }
+ },
+ {
+  "clip": "s12",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "driving",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Continuous forward dashcam drive on a daytime highway with clear parallax from light poles, guardrail and lane markings over a mostly static scene, with only small distant traffic and one overtaking car.",
+   "confidence": 0.8
+  }
+ },
+ {
+  "clip": "s12",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "driving",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Continuous forward-driving dashcam shot on a highway with real parallax from guardrails, light poles, trees and lane markings, where only one SUV and distant traffic move.",
+   "confidence": 0.85
+  }
+ },
+ {
+  "clip": "s13",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_dynamic",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "high",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_inaccurate",
+   "reason": "Continuous low hand-held forward walk through a dense pedestrian shopping street where close-range people and bags fill most of each frame, leaving only thin static strips of shopfronts, sky and pavement, so poses and depth would be unreliable.",
+   "confidence": 0.7
+  }
+ },
+ {
+  "clip": "s13",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_dynamic",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "high",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_inaccurate",
+   "reason": "A low camera walks forward through a dense shopping-street crowd, and close-up moving people fill much of every frame, so poses and depth would be unreliable even though the static shopfronts and pavement give some parallax.",
+   "confidence": 0.7
+  }
+ },
+ {
+  "clip": "s14",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "indoor_static",
+   "indoor_outdoor": "indoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Handheld forward walk along a museum ship's gun deck, with clear parallax from columns, cannons and plank floor over a static real scene; only a few tiny distant visitors.",
+   "confidence": 0.82
+  }
+ },
+ {
+  "clip": "s14",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "indoor_static",
+   "indoor_outdoor": "indoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Handheld walk-through along a real, textured ship gun deck (columns, cannons, planks) with continuous forward motion and strong parallax, and only a few tiny distant visitors.",
+   "confidence": 0.85
+  }
+ },
+ {
+  "clip": "s15",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_dynamic",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "medium",
+   "camera_motion": "static",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "Static telephoto close-up of wind-swaying sunflowers with shallow depth of field and an almost unchanged framing, so there is no camera parallax and the moving flowers fill the frame.",
+   "confidence": 0.85
+  }
+ },
+ {
+  "clip": "s15",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "static",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "Telephoto, shallow-depth-of-field close-up of a sunflower that stays framed in the same spot, with only gentle wind sway and no real camera translation, so there is no usable parallax and the background is mostly defocused.",
+   "confidence": 0.75
+  }
+ },
+ {
+  "clip": "s16",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_dynamic",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "medium",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": true,
+   "reconstructable": "no_inaccurate",
+   "reason": "Low ground-level follow shot of a walker's legs through a real forest: the trees give parallax, but heavy foreground motion blur, a moving subject in the frame centre and a full-frame leaf occlusion at 10.8s would make poses and depth unreliable.",
+   "confidence": 0.62
+  }
+ },
+ {
+  "clip": "s16",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_dynamic",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "medium",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": true,
+   "reconstructable": "no_inaccurate",
+   "reason": "Low-angle follow shot of a walker's legs through a forest: the trees give parallax, but heavy foreground motion blur, a large moving subject in the frame centre and a full-frame leaf occlusion at 10.8s would make poses and depth unreliable.",
+   "confidence": 0.6
+  }
+ },
+ {
+  "clip": "s17",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_rotation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "The camera pans steadily over a distant city skyline, and near towers and far buildings shift by the same amount, so there is no parallax to recover geometry.",
+   "confidence": 0.8
+  }
+ },
+ {
+  "clip": "s17",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_rotation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "A smooth constant-rate pan to the right across a distant waterfront skyline: the near towers and far buildings shift by the same amount per step (about 35 px), so there is no parallax and SfM would have no usable baseline.",
+   "confidence": 0.85
+  }
+ }
+]

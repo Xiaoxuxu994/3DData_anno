@@ -1,0 +1,530 @@
+[
+ {
+  "clip": "mk_41574",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "The camera moves slowly forward along a cobbled forest road, and the embankment, trunks and grass clump show clear parallax in a static real scene with no moving objects, cuts or overlays.",
+   "confidence": 0.74
+  }
+ },
+ {
+  "clip": "mk_41574",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Camera moves slowly forward along a forest road past a static earth bank, pine trees and a paved surface, which gives real parallax. The frames show no moving objects, overlays, cuts, blur or fisheye distortion.",
+   "confidence": 0.72
+  }
+ },
+ {
+  "clip": "mk_50847",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Real, sunlit pine forest with a camera moving forward along a path, so trunks at many depths give strong parallax over a static scene, with no overlays or cuts.",
+   "confidence": 0.8
+  }
+ },
+ {
+  "clip": "mk_50847",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Smooth forward-moving camera through a real, static pine forest with strong parallax from trunks at many depths, continuous framing, no moving objects, overlays or cuts.",
+   "confidence": 0.8
+  }
+ },
+ {
+  "clip": "mk_43622",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mixed",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Low-altitude drone orbit and descent around a tower over a static real city, with strong foreground/background parallax, sharp frames, no cuts or overlays.",
+   "confidence": 0.72
+  }
+ },
+ {
+  "clip": "mk_43622",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mixed",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Continuous low-altitude drone orbit around a tall tower, with strong foreground-to-skyline parallax over a static, real urban scene.",
+   "confidence": 0.82
+  }
+ },
+ {
+  "clip": "mk_21589",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "indoor_static",
+   "indoor_outdoor": "indoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Real, static library interior where the camera moves forward and sideways past shelves and a column, so near objects shift against the distant wall (clear parallax), with sharp frames, good texture, no people, cuts or overlays.",
+   "confidence": 0.82
+  }
+ },
+ {
+  "clip": "mk_21589",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "indoor_static",
+   "indoor_outdoor": "indoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Real, empty library interior where the camera slides laterally past a bookshelf and pillar while the back wall stays fixed, giving strong foreground/background parallax with no moving objects or cuts.",
+   "confidence": 0.88
+  }
+ },
+ {
+  "clip": "mk_4206",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Continuous forward walk through a narrow whitewashed alley toward a blue door and stairs, with strong parallax over a static real scene, no cuts or overlays, and only tiny distant pedestrians.",
+   "confidence": 0.86
+  }
+ },
+ {
+  "clip": "mk_4206",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Continuous forward walk down a whitewashed alley with strong parallax over a static real scene, with only tiny distant pedestrians and no cuts, overlays or blur.",
+   "confidence": 0.85
+  }
+ },
+ {
+  "clip": "mk_3110",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "indoor_static",
+   "indoor_outdoor": "indoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_rotation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "Steady rightward pan across a static living room where near objects (sofa, table) and far ones (wall art, column, TV) shift by about the same amount, so there is almost no parallax.",
+   "confidence": 0.7
+  }
+ },
+ {
+  "clip": "mk_3110",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "indoor_static",
+   "indoor_outdoor": "indoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_rotation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "no_unreconstructable",
+   "reason": "Slow constant-rate pan to the right across a static living room, and the near coffee table and the far wall/lamp shift by the same amount, so there is almost no parallax and pose/depth would be degenerate.",
+   "confidence": 0.7
+  }
+ },
+ {
+  "clip": "mk_2789",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mixed",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Low-altitude drone orbit around a static boulder formation in a grassland valley, with continuous motion, clear parallax between the rocks, foreground stones and hills, and no cuts, overlays or moving objects.",
+   "confidence": 0.85
+  }
+ },
+ {
+  "clip": "mk_2789",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mixed",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "A low-altitude drone orbits a textured rock formation in a static real meadow, with clear parallax between rocks, boulders and hills, no cuts, no overlays and nothing moving.",
+   "confidence": 0.85
+  }
+ },
+ {
+  "clip": "mk_5290",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Continuous daylight close-up of a static rusty steel lattice tower with clear foreground-vs-background parallax as the camera slowly moves, no cuts, overlays or moving objects.",
+   "confidence": 0.7
+  }
+ },
+ {
+  "clip": "mk_5290",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Handheld close-up of a rusty steel lattice tower in daylight, with clear foreground-versus-background parallax as the camera moves around it; the scene is static, with no cuts or overlays, though the background foliage is dark and defocused.",
+   "confidence": 0.7
+  }
+ },
+ {
+  "clip": "px_19834200",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "indoor_static",
+   "indoor_outdoor": "indoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Handheld forward walk down a church aisle gives strong parallax from nearby pews over a mostly static, well-lit real scene with only a few seated people and mild ultrawide distortion.",
+   "confidence": 0.8
+  }
+ },
+ {
+  "clip": "px_19834200",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "indoor_static",
+   "indoor_outdoor": "indoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Continuous hand-held forward walk down a well-lit church aisle gives clear parallax over static pews and architecture, with only a few seated or briefly passing people at the edges.",
+   "confidence": 0.87
+  }
+ },
+ {
+  "clip": "px_4072162",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Low-altitude drone flight toward and past a church tower in one continuous shot, with strong parallax over a static, real, sharp town scene and only a few tiny pedestrians.",
+   "confidence": 0.82
+  }
+ },
+ {
+  "clip": "px_4072162",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Low-altitude drone fly-over of a church and town square with continuous forward motion, strong parallax between the tower and background, and a static real scene (only tiny pedestrians).",
+   "confidence": 0.82
+  }
+ },
+ {
+  "clip": "px_8435627",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "A low-altitude drone-style camera flies steadily forward from the formal garden toward a chateau facade in daylight, with clear parallax between the foreground terraces and stairs, the building and the background trees, over a static, real, sharp scene with no people, cuts or overlays.",
+   "confidence": 0.88
+  }
+ },
+ {
+  "clip": "px_8435627",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "A smooth forward approach toward a static chateau across a formal garden gives clear parallax and depth layering, with no people, cuts, overlays, or blur.",
+   "confidence": 0.88
+  }
+ },
+ {
+  "clip": "px_854417",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "indoor_static",
+   "indoor_outdoor": "indoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Continuous forward walk along a static, well-lit library aisle with textured bookshelves, strong parallax, and no people, overlays, or cuts.",
+   "confidence": 0.88
+  }
+ },
+ {
+  "clip": "px_854417",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "indoor_static",
+   "indoor_outdoor": "indoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "A continuous forward walk down a well-lit, richly textured library aisle with bookshelves and windows passing by, no people, no cuts, no overlays, real footage with clear parallax.",
+   "confidence": 0.86
+  }
+ }
+]

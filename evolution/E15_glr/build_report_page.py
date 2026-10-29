@@ -319,6 +319,35 @@ def build(a):
     fe_pass = sum(1 for r in f_easy if r["first_stop"] in ("gate", "passed_all", "incomplete") and r["rules"] != "stop" and r["vlm"] != "stop")
     fc_caught = sum(1 for r in f_ctl if r["first_stop"] in ("rules", "vlm", "route", "gate"))
     single = [r["clip"] for r in f_ctl if r.get("n_layers_stopping") == "1"]
+
+    def vstat(run):
+        rs = [by[c][run] for c in ids_e if run in by.get(c, {}) and by[c][run].get("outcome")]
+        fes = [abs(float(r["focal_err_pct"])) for r in rs if r.get("focal_err_pct")]
+        return {"n": len(rs), "gate": sum(r["verdict"] != "stop" for r in rs), "silver": sum(r["silver_accurate"] == "True" for r in rs),
+                "silent": sum(r["outcome"] == "silent_error" for r in rs), "med": statistics.median(fes) if fes else float("nan")}
+    V = {k: vstat(k) for k in ("v0a", "v0b", "v1sp", "v2prior", "v3fixed")}
+    three = {"rg": 0, "ar": 0, "ag": 0, "all": 0, "none": 0, "n": 0}
+    for c in ids_e:
+        a_, rf = by.get(c, {}).get("v0a"), by.get(c, {}).get("ref")
+        if not a_ or not rf or not a_.get("focal_w") or not rf.get("focal_w") or not a_.get("witness_focal_w") or rf.get("ref_failed") == "True":
+            continue
+        if float(rf.get("reg_frac") or 0) < 0.9:
+            continue
+        fx, fy = float(a_["focal_w"]), float(a_["focal_w"]) / float(a_["fx_fy"])
+        fr, fg = float(rf["focal_w"]), float(a_["witness_focal_w"])
+        w = lambda x: max(abs(fx / x - 1), abs(fy / x - 1))  # noqa: E731
+        ar, ag, rg = w(fr) <= .1, w(fg) <= .1, abs(fr / fg - 1) <= .1
+        three["n"] += 1
+        if ar and ag and rg:
+            three["all"] += 1
+        elif rg and not ar:
+            three["rg"] += 1
+        elif ar and not ag:
+            three["ar"] += 1
+        elif ag and not ar:
+            three["ag"] += 1
+        else:
+            three["none"] += 1
     t_easy_par = [par[c]["rot_p90_over_flow_med"] for c in ids_e if c in par and par[c].get("rot_p90_over_flow_med") is not None]
     pans = [par[c]["rot_p90_over_flow_med"] for c in ("ctl_pan_4448", "mk_3110") if c in par and par[c].get("rot_p90_over_flow_med") is not None]
 
@@ -461,7 +490,9 @@ def build(a):
 <p>银参考 = 另一次 SfM（每 6 帧、穷举匹配、SIMPLE_RADIAL、增量建图），不是真值，所以这里先问“两次独立重建的焦距是否一致”，再看 GeoCalib 站谁。</p>
 {figure(a.figs, 'fig_variants_vs_reference.png', '每个简单片段对银参考：焦距误差（横）与 ATE（纵）。绿框 = 预声明的“一致”区域；标记形状 = 关口裁决。', '变体对银参考')}
 <ul class="tight"><li>航拍和前进镜头里焦距几乎不可观测：复刻的焦距常停在初值 1.2×长边附近，fx 与 fy 各自漂移，被 <code>fx_fy_mismatch</code> 拦下；或者通过关口但焦距偏差 20–80 %。</li>
-<li>银参考也会错（例如 mk_41574：复刻 0.81、GeoCalib 0.81、参考 1.15），所以单靠它不能判“静默错误”；这部分在 E 表里用三方对照单独列出，属于事后分析，不进预声明的结局统计。</li>
+<li>换建图种子（v0b）结果不变，焦距误差是确定的，重跑发现不了。把 GeoCalib 焦距当初值（v2prior，{V['v2prior']['n']} 条）最后落回和 v0a 同样的解（静默错误 {V['v2prior']['silent']}），优化器丢掉了先验。把 GeoCalib 焦距固定（v3fixed）过关口 {V['v3fixed']['gate']} / {V['v3fixed']['n']}，与银参考一致 {V['v3fixed']['silver']} / {V['v3fixed']['n']}，焦距中位误差 {num(V['v3fixed']['med'], 0)} %，是沙箱里最好的一种；但它的“一致”只是和另一次重建、一个单图先验一致。</li>
+<li>SIMPLE_PINHOLE（v1sp）把过关口的从 {V['v0a']['gate']} / {V['v0a']['n']} 提到 {V['v1sp']['gate']} / {V['v1sp']['n']}，静默错误从 {V['v0a']['silent']} 升到 {V['v1sp']['silent']}：它关掉了 fx/fy 这个“焦距定不下来”的警报，焦距还是错的，所以不能单独当修法。</li>
+<li>三方对照（复刻、银参考、GeoCalib，{three['n']} 条，容差 10 %）：三者一致 {three['all']}；只有两个一致的组合里，银参考 = GeoCalib {three['rg']} 次，复刻 = 银参考 {three['ar']} 次，复刻 = GeoCalib {three['ag']} 次；互不一致 {three['none']}。自由焦距的复刻是三者里最不可靠的一个。这张表是事后分析，不进预声明的结局统计。</li>
 <li>修法不在门槛上：评估会话的焦距扫描（E14）、K 先验初始化、固定 K、SIMPLE_PINHOLE，需要在服务器上用真实 GLRMap 做 Phase 0.2b 的消融，runbook 里写了通过线。</li></ul></section>
 
 <section id="demo"><h2>联调演示<small>route → worker (gate) → collect → QC → merge on real clips</small></h2>

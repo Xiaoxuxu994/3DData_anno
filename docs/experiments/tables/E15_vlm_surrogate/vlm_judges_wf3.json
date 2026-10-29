@@ -1,0 +1,178 @@
+[
+ {
+  "clip": "s18",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Smooth, continuous low-altitude aerial flight toward and over a rock butte gives strong parallax over a static, real, sharp canyon scene with no cuts or overlays.",
+   "confidence": 0.72
+  }
+ },
+ {
+  "clip": "s18",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Continuous low-altitude aerial flight toward and over a textured Grand Canyon butte, with the near rock growing against a nearly unchanged distant backdrop, so there is real parallax over a static real scene with no cuts, overlays or moving objects.",
+   "confidence": 0.72
+  }
+ },
+ {
+  "clip": "s19",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mixed",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Smooth drone glide past a canyon spur gives real parallax between the near ridge and the distant butte over a static, sharp, real landscape with no cuts or overlays.",
+   "confidence": 0.65
+  }
+ },
+ {
+  "clip": "s19",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mixed",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Smooth drone arc along a canyon rim, where the near ridge turns from end-on to side-on while the distant butte drifts the other way, so there is real parallax over a static, well-textured real scene (large scale makes metric depth harder).",
+   "confidence": 0.62
+  }
+ },
+ {
+  "clip": "s20",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Low-altitude flight along a river in a rocky canyon: the sandbar and slopes shift against the distant mesa (clear parallax), and the shot is continuous and sharp, with only the river surface moving.",
+   "confidence": 0.72
+  }
+ },
+ {
+  "clip": "s20",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "low",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Continuous low-altitude forward flight along a river in a canyon, with clear parallax from the nearby hillside and sandbars over a static real scene; only the river surface moves.",
+   "confidence": 0.8
+  }
+ },
+ {
+  "clip": "s21",
+  "judge": 1,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "Low-altitude drone flight past a canyon cliff, with strong foreground-to-background parallax over a static, textured real scene and no cuts, overlays or moving objects.",
+   "confidence": 0.75
+  }
+ },
+ {
+  "clip": "s21",
+  "judge": 2,
+  "verdict": {
+   "scene_category": "outdoor_static",
+   "indoor_outdoor": "outdoor",
+   "dynamic_level": "none",
+   "camera_motion": "mostly_translation",
+   "overlays": {
+    "subtitles": false,
+    "watermark": false,
+    "picture_in_picture": false
+   },
+   "has_cuts": false,
+   "is_cg_or_game": false,
+   "fisheye": false,
+   "low_light_or_blur": false,
+   "reconstructable": "yes",
+   "reason": "A low-altitude drone-style flight past a canyon cliff shows clear foreground/background parallax over a static, sharp, real landscape with no cuts or overlays, though much of the frame is distant terrain.",
+   "confidence": 0.65
+  }
+ }
+]
