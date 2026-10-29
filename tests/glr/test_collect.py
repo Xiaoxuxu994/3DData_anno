@@ -262,6 +262,78 @@ class ReadGlr(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             self.assertFalse(GC.read_glr(Path(td), {"image_names": [], "frame_idx": []})["ok"])
 
+    @staticmethod
+    def make_result(td, names, n_scene=2000):
+        res = Path(td) / "result"
+        c2w = _fix.look_at_rig(len(names), 0.25)
+        K = np.array([[500.0, 0, 320], [0, 500, 180], [0, 0, 1]])
+        _fix.write_text_model(res / "stage1" / "sparse" / "0", c2w, K, 640, 360, _fix.scene_points(n_scene), names)
+        return res
+
+    def test_depth_maps_resolution_mixture_sources_and_duplicates(self):
+        with tempfile.TemporaryDirectory() as td:
+            n = 8
+            names = [f"{k + 1:06d}.jpg" for k in range(n)]
+            res = self.make_result(td, names)
+            fused, other = res / "dense" / "pda" / "fused", res / "dense" / "deeper" / "x" / "fused"
+            fused.mkdir(parents=True)
+            other.mkdir(parents=True)
+            for k in range(n):
+                if k == 2:
+                    np.savez(fused / f"{k + 1:06d}.npz", coarse=np.full((180, 320), 2.0, np.float32))     # coarse only
+                elif k == 3:
+                    np.savez(fused / f"{k + 1:06d}.npz", fine=np.full((90, 160), 4.0, np.float32))        # another resolution
+                else:
+                    np.savez(fused / f"{k + 1:06d}.npz", fine=np.full((180, 320), 4.0, np.float32))
+            np.savez(other / "000001.npz", fine=np.full((180, 320), 99.0, np.float32))                    # same number, deeper directory
+            job = {"clip": "c", "image_names": names, "frame_idx": list(range(0, 2 * n, 2))}
+            g = GC.read_glr(res, job, 512)
+            self.assertTrue(g["ok"])
+            self.assertEqual(g["depth_source"], "pda_mixed")                                              # fine + coarse were read
+            self.assertEqual(g["n_depth_resized"], 1)                                                    # the 90 x 160 map did not kill the clip
+            self.assertAlmostEqual(float(g["depth"][0, 0, 0]), 4.0)                                      # the shallower fused/ wins
+            self.assertAlmostEqual(float(g["depth"][3, 0, 0]), 4.0)
+            self.assertAlmostEqual(float(g["depth"][2, 0, 0]), 2.0)
+            job, glr, s1, wit = case()
+            glr["n_depth_resized"], glr["n_unmapped"] = 1, 2
+            _, qc = GC.qc_one(job, glr, s1, wit, CFG)
+            self.assertIn("depth_resized", qc["info_flags"])
+            self.assertIn("unmapped_images", qc["info_flags"])
+
+    def test_all_nan_depth_is_no_depth(self):
+        with tempfile.TemporaryDirectory() as td:
+            names = [f"{k + 1:06d}.jpg" for k in range(8)]
+            res = self.make_result(td, names)
+            (res / "d" / "fused").mkdir(parents=True)
+            for k in range(8):
+                np.savez(res / "d" / "fused" / f"{k + 1:06d}.npz", fine=np.full((36, 64), np.nan, np.float32))
+            g = GC.read_glr(res, {"clip": "c", "image_names": names, "frame_idx": list(range(8))}, 512)
+            self.assertEqual(g["depth_source"], "none")
+
+    def test_images_are_mapped_to_job_frames_by_exact_name(self):
+        job_names = [f"{k + 1:06d}.jpg" for k in range(8)]
+        job = {"clip": "c", "image_names": job_names, "frame_idx": list(range(0, 16, 2))}
+        with tempfile.TemporaryDirectory() as td:                                   # the model knows the job's names
+            g = GC.read_glr(self.make_result(td, job_names), job, 512)
+            self.assertEqual((g["mapped_by"], g["n_unmapped"], g["n_reg"]), ("name", 0, 8))
+        with tempfile.TemporaryDirectory() as td:                                   # GLRMap renamed them: the frame number, one-to-one
+            g = GC.read_glr(self.make_result(td, [f"frame_{k + 1:06d}.jpg" for k in range(8)]), job, 512)
+            self.assertEqual((g["mapped_by"], g["n_unmapped"], g["n_reg"]), ("number", 0, 8))
+            self.assertEqual(g["frame_idx"].tolist(), job["frame_idx"])
+        with tempfile.TemporaryDirectory() as td:                                   # 0-based names would silently shift every frame: refused
+            g = GC.read_glr(self.make_result(td, [f"{k:06d}.jpg" for k in range(8)]), job, 512)
+            self.assertFalse(g["ok"] and g["n_unmapped"] == 0)
+        with tempfile.TemporaryDirectory() as td:                                   # names with several digit groups do not crash
+            g = GC.read_glr(self.make_result(td, [f"clip2_{k + 1:06d}.jpg" for k in range(8)]), job, 512)
+            self.assertEqual((g["mapped_by"], g["n_reg"]), ("number", 8))
+        with tempfile.TemporaryDirectory() as td:                                   # nothing maps: a clean failure, not an IndexError
+            g = GC.read_glr(self.make_result(td, [f"IMG_{k:04d}x.jpg" for k in range(8)]), job, 512)
+            self.assertEqual((g["ok"], g["why"]), (False, "no_image_maps_to_the_job"))
+        with tempfile.TemporaryDirectory() as td:                                   # a few unknown images: dropped and counted
+            names = job_names[:6] + ["extra_a.jpg", "extra_b.jpg"]
+            g = GC.read_glr(self.make_result(td, names), job, 512)
+            self.assertEqual((g["mapped_by"], g["n_unmapped"], g["n_reg"]), ("name", 2, 6))
+
 
 class CollectFiles(unittest.TestCase):
     """glr_collect.py on job directories (no pycolmap needed: only paths whose result is a stub QC are exercised)."""
@@ -389,6 +461,66 @@ class CollectFiles(unittest.TestCase):
         self.assertEqual(GC.find_model_dir(rd), rd / "run" / "deep" / "er" / "sparse" / "0")   # what the gate actually looked at
         (rd / "result.json").write_text(json.dumps({"gate_model": "gone/sparse/0"}))
         self.assertEqual(GC.find_model_dir(rd), rd / "stage1" / "sparse" / "0")
+
+
+class LoadWitnesses(unittest.TestCase):
+    """glr_collect.load_witnesses is the production path (v1.3 bench layout); the experiment modules it imports need OpenEXR and hard-coded
+    roots, so they are replaced by stand-ins that return a known scene. What is tested is the glue: grids, frame counts, what is read where."""
+
+    def test_bench_layout_to_witness_bundle(self):
+        import sys
+        import types
+        n, hw0 = 40, (270, 480)
+        hw_qc = C.qc_grid(*hw0, 512)
+        calls = []
+        DA3_MISSING = False
+
+        def load_method(B, method, clip, n_, H, W):
+            calls.append((method, n_, H, W))
+            if method == "da3_pkvipe" and DA3_MISSING:
+                raise FileNotFoundError(method)
+            T = _fix.look_at_rig(n_, 0.1)
+            K = np.tile(np.array([[400.0, 0, W / 2], [0, 400, H / 2], [0, 0, 1]]), (n_, 1, 1))
+            return T, K, np.full((n_, H, W), 5.0, np.float32), np.nan
+
+        stubs = {"eval3d_bench": types.ModuleType("eval3d_bench"), "qc_common": types.ModuleType("qc_common")}
+        stubs["eval3d_bench"].load_method = load_method
+        stubs["qc_common"].vipe_static_mask = lambda B, clip, n_, hw: np.zeros((n_, *hw), np.uint8)
+        saved = {k: sys.modules.get(k) for k in stubs}
+        sys.modules.update(stubs)
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                out = Path(td)
+                B = out / "bench"
+                (B / "gate").mkdir(parents=True)
+                (B / "vipe" / "intrinsics").mkdir(parents=True)
+                (B / "pi3x_kgate" / "c").mkdir(parents=True)
+                (B / "gate" / "c.json").write_text(json.dumps({"others_med": 62.0, "kdis": 1.0}))
+                np.savez(B / "vipe" / "intrinsics" / "c.npz", data=np.tile([400.0, 400.0, 240.0, 135.0], (n, 1)), inds=np.arange(n))
+                np.savez(B / "pi3x_kgate" / "c" / "pred.npz", c2w=np.zeros((n, 4, 4)))
+                job = {"clip": "c", "n_orig": n, "hw": list(hw0)}
+                W = GC.load_witnesses(out, job, CFG)
+                self.assertEqual([c[0] for c in calls], ["vipe", "da3_pkvipe", "pi3x_kgate"])
+                self.assertTrue(all(c[1:] == (n, *hw_qc) for c in calls))                    # every witness is read on the QC grid, all frames
+                self.assertEqual(W["D"].shape, (n, *hw_qc))
+                self.assertEqual(W["da3_D"].shape, (n, *hw_qc))
+                self.assertTrue(W["static"].all())
+                self.assertEqual(W["gate"]["others_med"], 62.0)
+                self.assertAlmostEqual(W["vipe_focal_cv"], 0.0)
+                self.assertEqual((W["v13"]["W"], W["v13"]["c2w"].shape), (hw_qc[1], (n, 4, 4)))
+                DA3_MISSING = True                                                          # DA3 absent: None, which qc_one rejects as not checkable
+                self.assertIsNone(GC.load_witnesses(out, job, CFG)["da3_D"])
+                (B / "gate" / "c.json").unlink()
+                (B / "pi3x_kgate" / "c" / "pred.npz").unlink()
+                W = GC.load_witnesses(out, job, CFG)
+                self.assertIsNone(W["gate"])
+                self.assertNotIn("v13", W)
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    sys.modules.pop(k, None)
+                else:
+                    sys.modules[k] = v
 
 
 class WitnessNpz(unittest.TestCase):

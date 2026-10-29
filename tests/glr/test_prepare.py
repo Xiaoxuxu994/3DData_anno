@@ -69,6 +69,19 @@ class Stride(unittest.TestCase):
                 self.assertGreaterEqual(s, 1)
                 self.assertLessEqual(s, CFG["sampling"]["max_stride"])
 
+    def test_window_is_kept_without_flow_statistics_and_for_long_or_short_clips(self):
+        import math
+        lo, hi = CFG["sampling"]["min_frames"], CFG["sampling"]["max_frames"]
+        for n in (60, 75, 90, 120, 180, 240, 400, 1000, 3000):
+            for mag in (None, 0.004, 0.03):
+                k = P.choose_stride(n, mag, CFG)
+                self.assertTrue(lo <= math.ceil(n / k) <= hi, (n, mag, k, math.ceil(n / k)))
+        for n in (30, 59):                                                   # shorter than the window: every frame, nothing to choose
+            self.assertEqual(P.choose_stride(n, None, CFG), 1)
+        self.assertEqual(P.choose_stride(180, None, CFG), 2)                 # the usual 12 s clip keeps the default stride
+        self.assertEqual(P.choose_stride(90, None, CFG), 1)                  # stride 2 would give 45 < 60 images
+        self.assertLessEqual(math.ceil(1000 / P.choose_stride(1000, 0.09, CFG)), 2 * hi)   # fast + long: stride 1 is not allowed to explode
+
 
 def make_out(out, specs, n=180):
     """OUT tree of run_batch.sh for the given [(clip, scores, decision)]: frames, pool scores, clips json, filter decisions."""

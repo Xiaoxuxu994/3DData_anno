@@ -12,9 +12,10 @@ Usage: python tools/glr_gate_replay.py ROOT [ROOT ...] --out signals.csv [--labe
 Output: one row per stage-1 run with every signal of glr_stage1_gate, the gate verdict, and (with --labels) the label;
         a report: per rule and for the combined gate - how many non-accurate runs it flags (catch), how many accurate runs it stops
         (false stop). The pre-registered pass line (docs/GLR_INTEGRATION.md, Phase 0.2): >= 7 of 9 silent-wrong caught, >= 90 % of all
-        non-accurate flagged (stop or suspect), accurate runs falsely STOPPED <= 2 of the accurate set. Thresholds come from the config
-        and must not be tuned on the runs they are judged on - use leave-one-window-out folds (`--folds` groups runs by the first
-        path component) when you adjust them.
+        non-accurate flagged (stop or suspect), accurate runs falsely STOPPED <= 2 of the accurate set. Exit code 0 = PASS, 1 = FAIL,
+        3 = INCONCLUSIVE (no accurate / non-accurate / silent_wrong labelled run matched: a labels file whose keys match nothing must not
+        pass); label keys that matched no run are listed. Thresholds come from the config and must not be tuned on the runs they are
+        judged on; the tool fits nothing, it prints the window groups (first path component) to use for leave-one-window-out work.
 Needs numpy + pycolmap (the GLRMap environment has both). Windows with several repeats of the same run directory are separate rows.
 """
 
@@ -96,11 +97,15 @@ def main():
     if n_err:
         print(f"WARNING: {n_err} runs could not be read (verdict error, reason in column `stop`): they count as NOT flagged below")
     if not labels:
-        return
+        return 0
     acc = [r for r in rows if r["label"] == "accurate"]
     bad = [r for r in rows if r["label"] and r["label"] != "accurate"]
     silent = [r for r in rows if r["label"] == "silent_wrong"]
-    print(f"\nlabelled: {len(acc)} accurate, {len(bad)} non-accurate ({len(silent)} silent_wrong)")
+    run_keys = {r["run"] for r in rows} | {Path(r["run"]).name for r in rows}
+    unmatched = sorted(k for k in labels if k not in run_keys)
+    print(f"\nlabelled: {len(acc)} accurate, {len(bad)} non-accurate ({len(silent)} silent_wrong); {len(labels) - len(unmatched)}/{len(labels)} label keys matched a run")
+    if unmatched:
+        print("WARNING: label keys that matched no run (typo, or a path that is not relative to its ROOT?):", ", ".join(unmatched[:20]) + (" ..." if len(unmatched) > 20 else ""))
     flag = lambda r, rule: rule in (r.get("stop", "") + ";" + r.get("suspect", "")).split(";")  # noqa: E731
     print(f"{'rule':30s} {'catch non-acc':>14s} {'catch silent':>13s} {'false flag acc':>15s}")
     for rule in RULES:
@@ -113,16 +118,25 @@ def main():
     c_any, c_silent, fs = sum(any_flag(r) for r in bad), sum(any_flag(r) for r in silent), sum(stop(r) for r in acc)
     print(f"\ncombined gate: flags (stop or suspect) {c_any}/{len(bad)} non-accurate, {c_silent}/{len(silent)} silent_wrong; "
           f"false STOPS on accurate: {fs}/{len(acc)}")
-    ok_sil = (len(silent) == 0) or (c_silent >= min(7, len(silent) * 7 / 9))
-    ok_all = len(bad) == 0 or c_any / len(bad) >= 0.9
-    ok_fs = fs <= 2
-    print("pre-registered pass line (catch >= 7/9 silent, >= 90 % non-accurate, false stops <= 2):",
-          "PASS" if (ok_sil and ok_all and ok_fs) else "FAIL", f"(silent {ok_sil}, all {ok_all}, false-stop {ok_fs})")
+    # the pre-registered pass line needs evidence on both sides; with none it is INCONCLUSIVE, never a vacuous PASS (exit code 3)
+    if not acc or not bad or not silent:
+        missing = [n for n, ok in (("accurate runs", acc), ("non-accurate runs", bad), ("silent_wrong runs", silent)) if not ok]
+        print("pre-registered pass line (catch >= 7/9 silent, >= 90 % non-accurate, false stops <= 2): INCONCLUSIVE - no labelled " + ", ".join(missing))
+        verdict = 3
+    else:
+        ok_sil = c_silent >= min(7, len(silent) * 7 / 9)
+        ok_all = c_any / len(bad) >= 0.9
+        ok_fs = fs <= 2
+        print("pre-registered pass line (catch >= 7/9 silent, >= 90 % non-accurate, false stops <= 2):",
+              "PASS" if (ok_sil and ok_all and ok_fs) else "FAIL", f"(silent {ok_sil}, all {ok_all}, false-stop {ok_fs})")
+        verdict = 0 if (ok_sil and ok_all and ok_fs) else 1
     by_win = defaultdict(list)
     for r in rows:
         by_win[r["run"].split("/")[0]].append(r)
-    print(f"{len(by_win)} window groups (first path component) for leave-one-window-out threshold work")
+    print(f"{len(by_win)} window groups (first path component). The tool only counts; it fits no thresholds - if you adjust any, do it "
+          f"leave-one-window-out over these groups and report which numbers are in-sample.")
+    return verdict
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

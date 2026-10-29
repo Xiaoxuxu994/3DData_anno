@@ -126,10 +126,6 @@ class Geometry(unittest.TestCase):
         self.assertEqual(json.loads(json.dumps(o)), {"a": 1.234568, "b": None, "c": [1.0, None], "d": 3, "e": True})
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class ConfigFile(unittest.TestCase):
     def test_repo_yaml_equals_defaults(self):
         """configs/pipeline_glr_v0.yaml must not drift from glr_common.DEFAULTS / glr_stage1_gate.DEFAULT_CFG."""
@@ -140,3 +136,32 @@ class ConfigFile(unittest.TestCase):
             self.assertEqual(d[sec], C.DEFAULTS[sec], sec)
         self.assertEqual(d["stage1_gate"], G.DEFAULT_CFG)
         self.assertEqual(d["version"], C.DEFAULTS["version"])
+
+    def test_load_cfg_is_isolated_and_strict(self):
+        c = C.load_cfg(None)
+        c["qc"]["require_all_parts"] = False
+        c["qc"]["thr"]["kdis"] = 1.0
+        c["sampling"]["min_frames"] = 1
+        fresh = C.load_cfg(None)                              # mutating one config must never leak into DEFAULTS or the next config
+        self.assertTrue(fresh["qc"]["require_all_parts"])
+        self.assertEqual(fresh["qc"]["thr"]["kdis"], 13.2)
+        self.assertEqual(C.DEFAULTS["sampling"]["min_frames"], 60)
+        with self.assertRaises(FileNotFoundError):
+            C.load_cfg("/nonexistent/typo.yaml")              # an explicit path that does not exist is an error, not the defaults
+
+
+class ScaleGuards(unittest.TestCase):
+    def test_nan_camera_centre_gives_no_trajectory_vote_instead_of_an_exception(self):
+        T = _fix.look_at_rig(30, 0.3)
+        Dv = np.full((30, 40, 60), 6.0, np.float32)
+        ref = T.copy()
+        ref[5, :3, 3] = np.nan                                 # the witness does not cover this frame
+        r = C.metric_scale(T * 1.0, Dv * 0.5, ref, Dv)
+        self.assertTrue(np.isnan(r["s_vipe"]))
+        self.assertAlmostEqual(r["k"], 2.0, places=5)          # the depth ratio still gives the scale
+        r = C.metric_scale(T * 1.0, None, ref, Dv, neutral=float("nan"))
+        self.assertTrue(np.isnan(r["k"]))                      # no evidence at all
+
+
+if __name__ == "__main__":
+    unittest.main()

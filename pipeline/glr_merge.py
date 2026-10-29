@@ -9,6 +9,7 @@ every clip (re-pointed when the annotator changed, removed when the clip is no l
 replaced - never a label file, and a regular file sitting at a link's place is reported (final_label_is_a_file) and left alone.
 
 Policy (a tier is "no known failure signature fired", not "accurate"):
+  clip has a v1.3 / GLR row but no route row -> reject      (no_route_row: the route step was not re-run for it; never dropped silently)
   filter reject                              -> reject      (the filter's reasons are kept)
   route glr and GLRMap tier T1 / T2          -> GLRMap label (annotator glr)
   route glr and GLRMap T3 / failed / stopped -> v1.3 label if its own v1c rule accepts (annotator v13, fallback = yes) else reject
@@ -40,9 +41,16 @@ def truthy(x):
     return str(x).strip().lower() in ("true", "1", "yes")
 
 
+def v13_why(v13):
+    """Why the v1.3 row is not accepted: its reject flags, else its error text, else the v1c rule."""
+    return (v13.get("reject_flags") or v13.get("error") or "v1c").strip()
+
+
 def decide(route, glr, v13):
     """route row, GLR row (or None), v1.3 row (or None) -> (annotator, tier, accept, reason, fallback)."""
     r = route.get("route")
+    if r == "missing":
+        return None, "T3", False, "no_route_row", False
     if r == "reject":
         return None, "T3", False, "filter:" + (route.get("filter_reasons") or route.get("reasons") or ""), False
     v13_ok = v13 is not None and truthy(v13.get("accept"))
@@ -52,10 +60,10 @@ def decide(route, glr, v13):
         why = "glr:" + ((glr or {}).get("reasons") or "no_result")
         if v13_ok:
             return "v13", "v13", True, why, True
-        return None, "T3", False, why + (";v13:" + ((v13 or {}).get("reject_flags") or "v1c") if v13 is not None else ";v13:none"), False
+        return None, "T3", False, why + (";v13:" + v13_why(v13) if v13 is not None else ";v13:none"), False
     if v13_ok:
         return "v13", "v13", True, "", False
-    return None, "T3", False, "v13:" + ((v13 or {}).get("reject_flags") or "v1c_or_error"), False
+    return None, "T3", False, "v13:" + (v13_why(v13) if v13 is not None else "none"), False
 
 
 def sync_link(dst, src):
@@ -75,7 +83,12 @@ def sync_link(dst, src):
 
 def main():
     out = Path(sys.argv[1])
-    routes, v13s, glrs = read_csv(out / "filter" / "glr_route.csv"), read_csv(out / "results.csv"), read_csv(out / "results_glr.csv")
+    route_csv = out / "filter" / "glr_route.csv"
+    if not route_csv.exists():
+        sys.exit(f"{route_csv} not found - run `glr_prepare.py {out} route` (phase a) first; the merge decides per routed clip")
+    routes, v13s, glrs = read_csv(route_csv), read_csv(out / "results.csv"), read_csv(out / "results_glr.csv")
+    for clip in sorted((set(v13s) | set(glrs)) - set(routes)):   # results exist but the route step never saw the clip
+        routes[clip] = {"clip": clip, "route": "missing"}
     (out / "final" / "labels").mkdir(parents=True, exist_ok=True)
     rows = []
     for clip, rt in routes.items():

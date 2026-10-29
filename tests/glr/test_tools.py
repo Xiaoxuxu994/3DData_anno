@@ -23,14 +23,22 @@ class GateReplay(unittest.TestCase):
         cls.root = Path(cls.td.name) / "runs"
         K = np.array([[500.0, 0, 320], [0, 500, 180], [0, 0, 1]])
         X = _fix.scene_points(3000)
-        for run, planar in (("w1/good", 0.0), ("w1/planar", 1.0), ("w2/good2", 0.0)):
+        runs = (("w1/good", 0.0), ("w1/planar", 1.0), ("w2/good2", 0.0), ("w3/silent1", 1.0), ("w3/silent2", 1.0), ("w3/silent3", 1.0))
+        for run, planar in runs:
             d = cls.root / run
             _fix.write_text_model(d / "sparse" / "0", _fix.look_at_rig(20, 0.25), K, 640, 360, X)
             _fix.write_db(d / "database.db", 20, planar_frac=planar)
         with open(cls.root / "labels.csv", "w", newline="") as fh:
             w = csv.writer(fh)
             w.writerow(["run", "label"])
-            w.writerows([["w1/good", "accurate"], ["w1/planar", "degenerate"], ["w2/good2", "accurate"]])
+            w.writerows([["w1/good", "accurate"], ["w1/planar", "degenerate"], ["w2/good2", "accurate"],
+                         ["w3/silent1", "silent_wrong"], ["w3/silent2", "silent_wrong"], ["w3/silent3", "silent_wrong"]])
+        for name, rows in (("labels_no_silent.csv", [["w1/good", "accurate"], ["w1/planar", "degenerate"]]),
+                           ("labels_typo.csv", [["w1/gooood", "accurate"], ["nowhere/planar", "silent_wrong"]])):
+            with open(cls.root / name, "w", newline="") as fh:
+                w = csv.writer(fh)
+                w.writerow(["run", "label"])
+                w.writerows(rows)
 
     @classmethod
     def tearDownClass(cls):
@@ -42,18 +50,17 @@ class GateReplay(unittest.TestCase):
     def test_replay_report_and_output_safety(self):
         out = Path(self.td.name) / "new_dir" / "deeper" / "signals.csv"       # the directory does not exist yet
         r = self.tool(self.root, "--labels", self.root / "labels.csv", "--out", out)
-        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         with open(out) as fh:
             rows = {x["run"]: x for x in csv.DictReader(fh)}
-        self.assertEqual(sorted(rows), ["w1/good", "w1/planar", "w2/good2"])
+        self.assertEqual(sorted(rows), ["w1/good", "w1/planar", "w2/good2", "w3/silent1", "w3/silent2", "w3/silent3"])
         self.assertEqual(rows["w1/planar"]["verdict"], "stop")
         self.assertIn("planar_or_panoramic_pairs", rows["w1/planar"]["stop"])
         self.assertIn(rows["w1/good"]["verdict"], ("ok", "suspect"))
         self.assertAlmostEqual(float(rows["w1/good"]["focal_rel"]), 500 / 640, places=3)
         self.assertIn("catch non-acc", r.stdout)
-        self.assertIn("pre-registered pass line", r.stdout)
-        self.assertIn("PASS", r.stdout)                                        # the one non-accurate run is stopped, no accurate run is
-        self.assertIn("2 window groups", r.stdout)
+        self.assertIn("pass line (catch >= 7/9 silent, >= 90 % non-accurate, false stops <= 2): PASS", r.stdout)
+        self.assertIn("3 window groups", r.stdout)
         before = out.read_text()
         r = self.tool(self.root, "--out", out)                                 # never overwrites a result
         self.assertNotEqual(r.returncode, 0)
@@ -61,6 +68,28 @@ class GateReplay(unittest.TestCase):
         self.assertEqual(out.read_text(), before)
         self.assertNotEqual(self.tool(self.root).returncode, 0)                # --out is required: no default file in the cwd
         self.assertEqual([p.name for p in self.root.rglob("*") if p.name.startswith("database") and p.suffix not in (".db",)], [])   # read-only
+
+    def test_the_pass_line_is_never_vacuous(self):
+        out = Path(self.td.name) / "inc1.csv"
+        r = self.tool(self.root, "--labels", self.root / "labels_no_silent.csv", "--out", out)       # no silent_wrong run labelled
+        self.assertEqual(r.returncode, 3, r.stdout)
+        self.assertIn("INCONCLUSIVE - no labelled silent_wrong runs", r.stdout)
+        self.assertNotIn(": PASS", r.stdout)
+        out = Path(self.td.name) / "inc2.csv"
+        r = self.tool(self.root, "--labels", self.root / "labels_typo.csv", "--out", out)            # keys that match nothing
+        self.assertEqual(r.returncode, 3, r.stdout)
+        self.assertIn("WARNING: label keys that matched no run", r.stdout)
+        self.assertIn("nowhere/planar", r.stdout)
+        self.assertIn("0/2 label keys matched", r.stdout)
+        # a gate that misses the silent runs FAILS: relabel the good runs as silent_wrong
+        with open(self.root / "labels_fail.csv", "w", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(["run", "label"])
+            w.writerows([["w1/good", "silent_wrong"], ["w2/good2", "silent_wrong"], ["w3/silent1", "accurate"], ["w3/silent2", "accurate"],
+                         ["w3/silent3", "accurate"], ["w1/planar", "degenerate"]])
+        r = self.tool(self.root, "--labels", self.root / "labels_fail.csv", "--out", Path(self.td.name) / "fail.csv")
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn(": FAIL", r.stdout)
 
     def test_unreadable_run_is_reported_not_silently_dropped(self):
         root = Path(self.td.name) / "runs_bad"
@@ -74,6 +103,71 @@ class GateReplay(unittest.TestCase):
             row = next(csv.DictReader(fh))
         self.assertEqual(row["verdict"], "error")
         self.assertIn("WARNING: 1 runs could not be read", r.stdout)
+
+
+class RewriteCamera(unittest.TestCase):
+    """tools/stage1_sfm.py rewrite_camera (the ablation switch behind --reuse-db), extracted from the script: it parses its arguments at import."""
+
+    @classmethod
+    def setUpClass(cls):
+        import ast
+        import sqlite3
+        src = ast.parse((REPO / "tools" / "stage1_sfm.py").read_text())
+        keep = [n for n in src.body if (isinstance(n, ast.Assign) and any(getattr(t, "id", "") in ("MODEL_ID", "LAYOUT") for t in n.targets))
+                or (isinstance(n, ast.FunctionDef) and n.name == "rewrite_camera")]
+        cls.ns = {"np": np, "sqlite3": sqlite3, "sys": sys}
+        exec(compile(ast.Module(keep, []), "stage1_sfm.py", "exec"), cls.ns)
+
+    def db(self, td, model_id, params, w=640, h=360):
+        import sqlite3
+        path = Path(td) / "database.db"
+        con = sqlite3.connect(path)
+        con.execute("create table cameras (camera_id integer primary key, model integer, width integer, height integer, params blob, prior_focal_length integer)")
+        con.execute("insert into cameras values (1, ?, ?, ?, ?, 1)", (model_id, w, h, np.array(params, np.float64).tobytes()))
+        con.commit()
+        con.close()
+        return path
+
+    def read(self, path):
+        import sqlite3
+        mid, blob, prior = sqlite3.connect(path).execute("select model, params, prior_focal_length from cameras").fetchone()
+        return mid, np.frombuffer(blob, np.float64), prior
+
+    def test_conversions_keep_the_principal_point(self):
+        rw = self.ns["rewrite_camera"]
+        with tempfile.TemporaryDirectory() as td:
+            d = self.db(td, 2, [500.0, 321.0, 181.0, -0.05])                  # SIMPLE_RADIAL: [f, cx, cy, k1] - the old code read cy from k1
+            rw(d, "PINHOLE", 0.9)
+            mid, p, prior = self.read(d)
+            self.assertEqual((mid, prior), (1, 0))
+            self.assertTrue(np.allclose(p, [576.0, 576.0, 321.0, 181.0]))
+        with tempfile.TemporaryDirectory() as td:
+            d = self.db(td, 1, [700.0, 710.0, 320.0, 180.0])                  # PINHOLE -> SIMPLE_PINHOLE keeps fx
+            rw(d, "SIMPLE_PINHOLE", 0.0)
+            mid, p, _ = self.read(d)
+            self.assertEqual(mid, 0)
+            self.assertTrue(np.allclose(p, [700.0, 320.0, 180.0]))
+        with tempfile.TemporaryDirectory() as td:
+            d = self.db(td, 3, [500.0, 320.0, 180.0, -0.05, 0.01])            # no --db-camera: keep the model (and its distortion), set the focal
+            rw(d, "", 1.2)
+            mid, p, _ = self.read(d)
+            self.assertEqual(mid, 3)
+            self.assertTrue(np.allclose(p, [768.0, 320.0, 180.0, -0.05, 0.01]))
+        with tempfile.TemporaryDirectory() as td:
+            d = self.db(td, 1, [700.0, 710.0, 320.0, 180.0])
+            rw(d, "", 1.0)
+            self.assertTrue(np.allclose(self.read(d)[1], [640.0, 640.0, 320.0, 180.0]))   # PINHOLE: fx = fy = the prior
+
+    def test_unsupported_models_are_refused(self):
+        rw = self.ns["rewrite_camera"]
+        with tempfile.TemporaryDirectory() as td:
+            d = self.db(td, 99, [1.0, 2.0, 3.0])
+            with self.assertRaises(SystemExit):
+                rw(d, "PINHOLE", 1.0)
+        with tempfile.TemporaryDirectory() as td:
+            d = self.db(td, 1, [700.0, 710.0, 320.0, 180.0])
+            with self.assertRaises(SystemExit):
+                rw(d, "RADIAL", 1.0)
 
 
 @unittest.skipUnless(shutil.which("ffmpeg"), "ffmpeg not installed")

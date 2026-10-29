@@ -87,23 +87,33 @@ def route_clip(scores, cfg, filter_pass=True, vlm_tag=None, force=None):
 def choose_stride(n_frames, mag_median_frac, cfg):
     """Every `stride`-th frame of the 15 fps clip goes to GLRMap: n in [min_frames, max_frames] and the motion between
     consecutive GLRMap frames near target_step_frac of the image width (mag_median_frac = median mean-|flow| per 3 frames,
-    fraction of width, from filter stage s4). Without flow stats: default_stride."""
+    fraction of width, from filter stage s4). Without flow stats: default_stride when that keeps n in the window, otherwise the
+    stride whose n is closest to target_frames. A clip too long for max_stride to reach max_frames gets a larger stride (SfM cost
+    grows quickly with the image count; v1.3 clips are 12 s = 180 frames, so this only matters for custom --max-frames)."""
     s = cfg["sampling"]
+    lo, hi, tgt, smax = int(s["min_frames"]), int(s["max_frames"]), s["target_frames"], int(s["max_stride"])
+    n_of = lambda k: math.ceil(n_frames / k)  # noqa: E731
+
+    def closest():
+        k = min(range(1, smax + 1), key=lambda k: abs(n_of(k) - tgt))
+        while n_of(k) > hi:  # even max_stride leaves too many images
+            k += 1
+        return k
+
     if mag_median_frac is None:
-        return int(s["default_stride"])
+        d = int(s["default_stride"])
+        return d if lo <= n_of(d) <= hi else closest()
     per_frame = mag_median_frac / 3.0
     best = None
-    for stride in range(1, int(s["max_stride"]) + 1):
-        n = math.ceil(n_frames / stride)
+    for stride in range(1, smax + 1):
+        n = n_of(stride)
         step = per_frame * stride
-        if n < s["min_frames"] or (n > s["max_frames"] and not (stride == 1 and per_frame * 2 > 2.5 * s["target_step_frac"])):
-            continue  # stride 1 may exceed max_frames only when stride 2 would move more than 5 % of the width per step
+        if n < lo or (n > hi and not (stride == 1 and n <= 2 * hi and per_frame * 2 > 2.5 * s["target_step_frac"])):
+            continue  # stride 1 may exceed max_frames (up to twice) only when stride 2 would move more than 5 % of the width per step
         score = abs(math.log(max(step, 1e-6) / s["target_step_frac"]))
         if best is None or score < best[0]:
             best = (score, stride)
-    if best is not None:
-        return best[1]
-    return min(range(1, int(s["max_stride"]) + 1), key=lambda k: abs(math.ceil(n_frames / k) - s["target_frames"]))
+    return best[1] if best is not None else closest()
 
 
 def k_prior(bench, clip):

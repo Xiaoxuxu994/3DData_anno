@@ -132,6 +132,29 @@ class MergeFiles(unittest.TestCase):
         self.assertEqual(rows["a"]["accept"], "False")
         self.assertIn("label_file_missing", rows["a"]["reason"])
 
+    def test_missing_route_file_is_an_error_and_unrouted_clips_are_not_dropped(self):
+        self.write("results.csv", [{"clip": "a", "accept": "True"}])
+        r = subprocess.run([sys.executable, str(_fix.PIPE / "glr_merge.py"), str(self.out)], capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("glr_route.csv", r.stderr)
+        self.assertFalse((self.out / "final").exists())
+        self.write("filter/glr_route.csv", [{"clip": "a", "route": "v13"}])
+        self.write("results.csv", [{"clip": "a", "accept": "True"}, {"clip": "late", "accept": "True"}])
+        self.label("labels", "a", "v13:a")
+        self.label("labels", "late", "v13:late")
+        rows = self.merge()
+        self.assertEqual((rows["a"]["accept"], rows["late"]["accept"]), ("True", "False"))
+        self.assertEqual(rows["late"]["reason"], "no_route_row")
+        self.assertFalse((self.out / "final" / "labels" / "late.npz").exists())
+
+    def test_the_v13_error_text_is_surfaced(self):
+        self.write("filter/glr_route.csv", [{"clip": "a", "route": "v13"}, {"clip": "b", "route": "glr"}])
+        self.write("results.csv", [{"clip": "a", "accept": "False", "error": "no pi3x_kgate prediction"},
+                                   {"clip": "b", "accept": "False", "reject_flags": "jump60", "error": ""}])
+        rows = self.merge()
+        self.assertEqual(rows["a"]["reason"], "v13:no pi3x_kgate prediction")
+        self.assertIn("v13:jump60", rows["b"]["reason"])
+
     def test_nothing_routed_to_glr_still_produces_final(self):
         self.write("filter/glr_route.csv", [{"clip": "a", "route": "v13"}])
         self.write("results.csv", [{"clip": "a", "accept": "True"}])

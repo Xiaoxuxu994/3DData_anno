@@ -284,6 +284,8 @@ def main(argv=None):
         if a.require_db and not have_db:
             raise FileNotFoundError(f"database not found: {a.database!r}")
         d = summarize_db(a.database) if have_db else None
+        if a.require_db and not d.get("n_pairs_valid"):
+            raise ValueError("database has no verified image pairs (two_view_geometries is empty): the planar / panoramic check cannot run")
         v = gate(m, d, a.n_frames, cfg, wit)
         out = {"model": m, "db": d, "gate": v}
     except Exception as e:  # noqa: BLE001  - any failure of the gate itself must be visible, never read as "ok"

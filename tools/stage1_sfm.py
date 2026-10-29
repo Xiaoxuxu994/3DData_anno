@@ -80,19 +80,34 @@ def lap(name):
 
 
 MODEL_ID = {"SIMPLE_PINHOLE": 0, "PINHOLE": 1}
+# parameter layout of the COLMAP camera models a database can hold (model id -> names); the first parameter is always a focal length
+LAYOUT = {0: ("f", "cx", "cy"), 1: ("fx", "fy", "cx", "cy"), 2: ("f", "cx", "cy", "k1"), 3: ("f", "cx", "cy", "k1", "k2"),
+          4: ("fx", "fy", "cx", "cy", "k1", "k2", "p1", "p2")}
 
 
 def rewrite_camera(db, model, focal_w):
-    """Rewrite the (single, shared) camera of a copied database: model PINHOLE / SIMPLE_PINHOLE, initial focal = focal_w x width."""
+    """Rewrite the (single, shared) camera of a copied database. `model` PINHOLE / SIMPLE_PINHOLE converts the camera (distortion is
+    dropped, the principal point is kept); an empty `model` keeps the camera model and only sets the initial focal (focal_w x width)."""
     con = sqlite3.connect(str(db))
     cid, mid, w, h, blob = con.execute("select camera_id, model, width, height, params from cameras").fetchone()
-    p = np.frombuffer(blob, np.float64)
-    fx, cx, cy = (p[0], p[1], p[2]) if mid == 0 else (p[0], p[2], p[3])
-    if focal_w > 0:
-        fx = focal_w * w
-    new = model or ("SIMPLE_PINHOLE" if mid == 0 else "PINHOLE")
-    params = np.array([fx, cx, cy] if new == "SIMPLE_PINHOLE" else [fx, fx, cx, cy], np.float64)
-    con.execute("update cameras set model=?, params=?, prior_focal_length=0 where camera_id=?", (MODEL_ID[new], params.tobytes(), cid))
+    if mid not in LAYOUT:
+        con.close()
+        sys.exit(f"{db}: camera model id {mid} is not supported by --reuse-db rewriting (known: {sorted(LAYOUT)})")
+    names = LAYOUT[mid]
+    p = np.frombuffer(blob, np.float64).copy()
+    cx, cy = p[names.index("cx")], p[names.index("cy")]
+    fx = focal_w * w if focal_w > 0 else p[0]
+    if model:
+        if model not in MODEL_ID:
+            con.close()
+            sys.exit(f"--db-camera must be one of {sorted(MODEL_ID)}")
+        mid = MODEL_ID[model]
+        p = np.array([fx, cx, cy] if model == "SIMPLE_PINHOLE" else [fx, fx, cx, cy], np.float64)
+    else:
+        p[0] = fx
+        if names[1] == "fy":
+            p[1] = fx
+    con.execute("update cameras set model=?, params=?, prior_focal_length=0 where camera_id=?", (int(mid), p.tobytes(), cid))
     con.commit()
     con.close()
 
@@ -112,6 +127,8 @@ else:
         srcs = sorted(p for p in Path(a.images).iterdir() if p.suffix.lower() in (".jpg", ".jpeg", ".png"))[::max(a.stride, 1)]
         for i, p in enumerate(srcs):
             im = cv2.imread(str(p))
+            if im is None:
+                sys.exit(f"cannot read image {p}")
             if a.long and max(im.shape[:2]) > a.long:
                 sc = a.long / max(im.shape[:2])
                 im = cv2.resize(im, (int(round(im.shape[1] * sc / 2)) * 2, int(round(im.shape[0] * sc / 2)) * 2), interpolation=cv2.INTER_AREA)

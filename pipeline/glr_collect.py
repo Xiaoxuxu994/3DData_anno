@@ -37,6 +37,7 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -54,8 +55,10 @@ ROW_FIELDS = ["clip", "annotator", "tier", "accept", "v1c", "xtraj_ba", "xdepth_
 
 # ----------------------------------------------------------------------------- GLRMap result -> arrays
 def _frame_no(name):
-    digits = "".join(ch for ch in Path(name).stem if ch.isdigit())
-    return int(digits) if digits else None
+    """The frame number in a file name: the longest run of digits, the last one on a tie ('000012.npz', 'depth_000012.npz',
+    'clip2_000012.jpg' -> 12; 'a_0003_0007.npz' -> 7), else None."""
+    runs = re.findall(r"\d+", Path(name).stem)
+    return int(sorted(runs, key=len)[-1]) if runs else None
 
 
 def find_model_dir(res):
@@ -95,13 +98,15 @@ def find_result_dir(jd):
 
 
 def read_depth_maps(res, nos):
-    """Per-frame PDA depth: <res>/**/fused/<...number...>.npz with `fine` (else `coarse`). -> (dict frame_no -> 2D array, source)."""
-    out, src = {}, "none"
+    """Per-frame PDA depth: <res>/**/fused/<...number...>.npz with `fine` (else `coarse`). -> (dict frame_no -> 2D array, source, n_resized).
+    The same number in several fused/ directories resolves to the shallowest path. Maps whose shape differs from the most common one are
+    resized to it (nearest) and counted; the source is 'pda_fine' / 'pda_coarse' / 'pda_mixed' (what was actually read), 'none' without maps."""
     files = {}
-    for p in Path(res).glob("**/fused/*.npz"):
+    for p in sorted(Path(res).glob("**/fused/*.npz"), key=lambda q: (len(q.parts), str(q))):
         no = _frame_no(p.name)
         if no is not None:
-            files[no] = p
+            files.setdefault(no, p)
+    maps, keys = {}, set()
     for no in nos:
         p = files.get(no)
         if p is None:
@@ -111,11 +116,20 @@ def read_depth_maps(res, nos):
         if key is None:
             arrs = [k for k in z.files if z[k].ndim == 2 and z[k].dtype.kind == "f"]
             key = arrs[0] if arrs else None
-        if key is None:
+        if key is None or z[key].ndim != 2:
             continue
-        out[no] = z[key].astype(np.float32)
-        src = f"pda_{key}" if key in ("fine", "coarse") else f"pda_{key}"
-    return out, src
+        maps[no] = z[key].astype(np.float32)
+        keys.add(key)
+    n_resized = 0
+    if maps:
+        shape = Counter(m.shape for m in maps.values()).most_common(1)[0][0]
+        for no, m in maps.items():
+            if m.shape != shape:
+                import cv2
+                maps[no] = cv2.resize(m, (shape[1], shape[0]), interpolation=cv2.INTER_NEAREST)
+                n_resized += 1
+    src = "none" if not maps else ("pda_" + next(iter(keys)) if len(keys) == 1 else "pda_mixed")
+    return maps, src, n_resized
 
 
 def read_glr(res, job, label_long=512):
@@ -129,11 +143,16 @@ def read_glr(res, job, label_long=512):
     if not len(cams["names"]):
         return {"ok": False, "why": "no_registered_images"}
     names_job = job["image_names"]
-    k_idx = []
-    for nm in cams["names"]:
-        no = _frame_no(nm)
-        k_idx.append(no - 1 if no is not None and 1 <= no <= len(names_job) else -1)
+    pos = {nm: i for i, nm in enumerate(names_job)}
+    k_idx, mapped_by = [pos.get(nm, -1) for nm in cams["names"]], "name"   # model image -> position in the job, by exact name
+    if not any(k >= 0 for k in k_idx):  # GLRMap renamed the images: accept the frame number in the name, but only if that is one-to-one
+        nos = [_frame_no(nm) for nm in cams["names"]]
+        if all(n is not None and 1 <= n <= len(names_job) for n in nos) and len(set(nos)) == len(nos):
+            k_idx, mapped_by = [n - 1 for n in nos], "number"
+    n_unmapped = int(sum(k < 0 for k in k_idx))
     keep = [i for i, k in enumerate(k_idx) if k >= 0]
+    if not keep:
+        return {"ok": False, "why": "no_image_maps_to_the_job"}
     c2w = cams["c2w"][keep]
     K = cams["K"][keep]
     k_idx = np.array([k_idx[i] for i in keep])
@@ -144,8 +163,8 @@ def read_glr(res, job, label_long=512):
     W, H = cams["W"], cams["H"]
     out = {"ok": True, "why": "", "names": [names_job[k] for k in k_idx], "k_idx": k_idx, "frame_idx": frame_idx, "c2w": c2w, "K": K,
            "W": W, "H": H, "model": cams["model"], "n_reg": int(len(k_idx)), "depth": None, "K_label": K, "depth_source": "none",
-           "conf": None}
-    maps, src = read_depth_maps(res, [k + 1 for k in k_idx])
+           "conf": None, "mapped_by": mapped_by, "n_unmapped": n_unmapped, "n_depth_resized": 0}
+    maps, src, out["n_depth_resized"] = read_depth_maps(res, [k + 1 for k in k_idx])
     if maps:
         h0, w0 = next(iter(maps.values())).shape
         Hl, Wl = C.qc_grid(H, W, label_long)
@@ -154,7 +173,7 @@ def read_glr(res, job, label_long=512):
         Kn[:, 0, :] *= w0 / W
         Kn[:, 1, :] *= h0 / H
         out["depth"], out["K_label"] = C.to_grid(D, Kn, Hl, Wl)
-        out["depth_source"] = src
+        out["depth_source"] = src if np.isfinite(out["depth"]).any() else "none"   # all-NaN maps are no depth
         out["frame_with_depth"] = int(sum(int(k) + 1 in maps for k in k_idx))
     return out
 
@@ -250,7 +269,8 @@ def qc_one(job, glr, stage1, wit, cfg):
     min_cov = q.get("min_depth_cov", 0.9)
     info = [name for name, on in (("suspect_cut", f["jump20"] and not f["jump60"]), ("focal_unobservable", f["tiny_move"]),
                                   ("suspect_zoom", f["vipe_focal_cv"] > 0.07), ("partial_registration", reg_frac < 0.9),
-                                  ("depth_missing", not has_d), ("depth_partial", has_d and depth_cov < min_cov)) if on]
+                                  ("depth_missing", not has_d), ("depth_partial", has_d and depth_cov < min_cov),
+                                  ("unmapped_images", glr.get("n_unmapped", 0) > 0), ("depth_resized", glr.get("n_depth_resized", 0) > 0)) if on]
     info += [f"s1_{x}" for x in s1.get("suspect", [])]
     # ---- decision: a check that did not run is a reason to reject, not a pass
     why = []
@@ -279,7 +299,8 @@ def qc_one(job, glr, stage1, wit, cfg):
           "info_flags": info, "accept": bool(accept), "tier": tier, "reject_reasons": why,
           "scale": {k_: sc.get(k_) for k_ in ("k", "k_depth", "k_traj", "s_vipe", "r_vipe")}, "stage1": s1,
           "glr": {"n_reg": glr["n_reg"], "n_sampled": len(job["frame_idx"]), "stride": job.get("stride"), "model": glr.get("model"),
-                  "depth_source": glr["depth_source"], "depth_cov": depth_cov, "hfov": hf}}
+                  "depth_source": glr["depth_source"], "depth_cov": depth_cov, "hfov": hf, "mapped_by": glr.get("mapped_by", "name"),
+                  "n_unmapped": glr.get("n_unmapped", 0), "n_depth_resized": glr.get("n_depth_resized", 0)}}
     nan11 = np.full((n, 1, 1), np.nan, np.float32)
     label = {"c2w": cs, "K": glr["K_label"], "depth": Dm if Dm is not None else nan11,
              "conf": glr["conf"] if glr.get("conf") is not None else (np.isfinite(Dm).astype(np.float32) if Dm is not None else nan11),

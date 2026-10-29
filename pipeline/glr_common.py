@@ -249,8 +249,11 @@ def metric_scale(c2w_x, D_x, c2w_ref, D_ref, n_depth_frames=10, neutral=1.0):
                     dm = float(np.median(a[mk]))
     pb, pm = c2w_x[:, :3, 3], c2w_ref[:, :3, 3]
     Lm = float(np.linalg.norm(np.diff(pm, axis=0), axis=1).sum())
-    s_raw, R, t = umeyama(pb, pm, True)
-    res = float(np.sqrt(((s_raw * pb @ R.T + t - pm) ** 2).sum(1).mean()) / max(Lm, 1e-9))
+    if np.isfinite(pb).all() and np.isfinite(pm).all() and len(pb) >= 2:
+        s_raw, R, t = umeyama(pb, pm, True)
+        res = float(np.sqrt(((s_raw * pb @ R.T + t - pm) ** 2).sum(1).mean()) / max(Lm, 1e-9))
+    else:  # a NaN camera centre (frame the witness does not cover) makes the SVD fail: no trajectory vote, like traj_pct's guard
+        s_raw, res = float("nan"), float("nan")
     move = Lm / dm if np.isfinite(dm) else float("nan")
     s = float(s_raw) if (Lm > 0.02 * dm and res < 0.2 and s_raw > 0) else float("nan")
     k_t = s if np.isfinite(s) else (r if np.isfinite(r) else neutral)

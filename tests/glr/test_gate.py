@@ -174,6 +174,14 @@ class RealModelIO(unittest.TestCase):
         self.assertEqual(r.returncode, 4)
         self.assertFalse((self.root / "missing.db").exists())                              # and nothing was created next to the data
 
+    def test_database_without_verified_pairs_is_an_error_when_required(self):
+        db = self.root / "empty_pairs.db"
+        _fix.write_db(db, 20, n_pairs=0)
+        r = self.cli(self.root / "m", db, "20", "--require-db")
+        self.assertEqual(r.returncode, 4)
+        self.assertIn("no verified image pairs", json.loads(r.stdout)["gate"]["error"])
+        self.assertIn(self.cli(self.root / "m", db, "20").returncode, (0, 1))            # the replay tool's lenient mode still reads it
+
     def test_database_path_with_uri_characters(self):
         import shutil
         for name in ("x #shorts", "what?now", "100%", "a b"):
