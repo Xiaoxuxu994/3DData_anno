@@ -18,7 +18,7 @@
 
 ```bash
 export ANNO_ROOT=/data/home/<you>                 # 布局：$ANNO_ROOT/{code,cache,data,outputs}
-git clone git@github.com:Xiaoxuxu994/3DData_anno.git $ANNO_ROOT/code
+git clone https://github.com/Xiaoxuxu994/3DData_anno.git $ANNO_ROOT/code
 cd $ANNO_ROOT/code
 python3 tools/relocate.py $ANNO_ROOT --apply      # 旧脚本里的根路径换成你的（原机器上不需要）
 bash third_party/clone.sh                         # ViPE、Pi3、DA3，固定 commit
@@ -40,6 +40,75 @@ bash tests/regression_A.sh                        # 改代码后：A 组回归�
 
 2 项 WARN 来自 ViPE 重跑的随机性（KITTI 07 的 QC 4.28 / 4.43，标签本身一致，两次都拒），见 `docs/KNOWN_ISSUES.md` 第 7 条。
 
+## 从 YouTube 采集视频
+
+采集脚本在 `filter/`，只收 Creative Commons（CC-BY）许可的视频，切成 12 s、15 fps 的片段，产出的目录可以直接喂给 `pipeline/run_batch.sh`。三步都是命令行脚本，不需要 GPU。
+
+### 环境
+
+```bash
+uv venv --python 3.12 $ANNO_ROOT/cache/yt-venv
+grep -v '^#' envs/yt-venv.txt > /tmp/yt-req.txt
+uv pip install --python $ANNO_ROOT/cache/yt-venv/bin/python -r /tmp/yt-req.txt   # yt-dlp 2026.8.19、yt-dlp-ejs、deno、opencv
+export PY_YT=$ANNO_ROOT/cache/yt-venv/bin/python
+which ffmpeg                                         # 需要系统里有 ffmpeg，或用 FFMPEG=/path/to/ffmpeg 指定
+```
+
+yt-dlp 跟 YouTube 的改动更新很快，下载报错时先 `uv pip install -U yt-dlp yt-dlp-ejs`。
+
+### 三步命令
+
+```bash
+POOL=$ANNO_ROOT/data/my_pool && mkdir -p $POOL
+
+# 1. 搜索：12 类场景约 60 个关键词，每个关键词最多取 10 个合格视频，结果追加写入 candidates.json，中断后重跑会跳过已搜过的关键词
+$PY_YT filter/pool_search.py $POOL/candidates.json
+
+# 2. 挑选：每类均衡配额、每个频道最多 3 个视频，并给每个视频定 3–5 个起点（视频 10%–90% 之间均匀分布）
+$PY_YT filter/pool_clip.py select $POOL/candidates.json $POOL/picks.json 400     # 最后一个参数 = 视频数，默认 400
+
+# 3. 下载并切片：可以开多个 worker 并行（WORKER_ID 从 0 开始），已完成的片段会跳过，可断点续跑
+for w in 0 1 2 3; do
+  $PY_YT filter/pool_clip.py cut $POOL/picks.json $POOL $w 4 > $POOL/cut.w$w.log 2>&1 &
+done; wait
+$PY_YT filter/pool_clip.py index $POOL $POOL/picks.json                         # 生成 $POOL/pool.json
+```
+
+接着打标：`bash pipeline/run_batch.sh <out_dir> $POOL/*/clip.mp4 --split-cuts`（参数见上文和 `pipeline/README.md`）。
+
+### 输出
+
+| 路径 | 内容 |
+|---|---|
+| `candidates.json` | 每个搜索结果一条：`id`、`title`、`channel`、`license`、`duration`、`height`、`fps`、`query`、`cat_hint`；`ok` 表示通过预筛（CC 许可、≥1080p、2–60 min、不是 Shorts） |
+| `picks.json` | 选中的视频和每个视频的起点 `starts` |
+| `<cat>__<video_id>__<start>/clip.mp4` | 12 s、15 fps、≤1080p、无音频 |
+| `<cat>__<video_id>__<start>/frames/` | 180 张 JPEG，宽 960 |
+| `<cat>__<video_id>__<start>/sheet.jpg` | 6 帧缩略图，用来快速目检 |
+| `<cat>__<video_id>__<start>/meta.json` | 许可证、频道、带 `&t=` 的原视频链接、分辨率、帧数，发布数据时用它做署名 |
+| `_raw/<video_id>/` | yt-dlp 下载的原始片段（可删）；下载失败的视频里有 `FAILED`，重跑时跳过，删掉这个文件才会重试 |
+| `pool.json` | 所有片段的 `meta.json` 汇总 |
+
+### 改成自己的需求
+
+- **关键词和类别**：改 `filter/pool_search.py` 开头的 `Q` 字典（类别 → 关键词列表）。`select` 的第 4 个参数 `n_cats` 默认 12，类别数变了要一起改，比如 `select cand.json picks.json 400 5`。
+- **预筛条件**：`pool_search.py` 里 `r["ok"] = ...` 那一行（许可证、分辨率、时长）。
+- **片段长度、帧率、帧宽**：`pool_clip.py` 里的 `FPS, LEN, FW = 15, 12, 960`。
+- **下载分辨率**：`pool_clip.py` 里 yt-dlp 的 `-f "bv*[height<=1080]..."`。
+
+### 注意
+
+- **排除列表**：`select` 会读 `$ANNO_ROOT/data/eval3d/C_wild/clips.json` 和 `$ANNO_ROOT/outputs/bench/youtube/clips.json`，排除评测集里已用过的视频。新机器上没有这两个文件会报错，先建空列表：
+  ```bash
+  mkdir -p $ANNO_ROOT/data/eval3d/C_wild $ANNO_ROOT/outputs/bench/youtube
+  for f in $ANNO_ROOT/data/eval3d/C_wild/clips.json $ANNO_ROOT/outputs/bench/youtube/clips.json; do [ -f $f ] || echo '[]' > $f; done
+  ```
+- **路径**：`pool_clip.py` 里写死了 `/data/home/z00533370`，换机器先跑 `tools/relocate.py`（见快速开始）。
+- **限流**：快速连续请求约 300 次 metadata 后 YouTube 会软限流。脚本在请求之间随机等待（搜索 0.5–1.5 s，每个视频下载后 5–12 s），碰到 "not a bot" 会停 60 s。不要把 worker 开太多，4 个以内比较稳。
+- **超时**：每个视频的下载有硬超时（180 s + 每段 120 s）。在 Python 进程里直接调 yt-dlp 下载片段曾卡住几个小时，所以用的是命令行子进程。
+- **规模参考**（2026-10-17）：搜到 921 个视频，553 个通过预筛，选 444 个，切出 1835 段，原始下载约 18 GB。
+- **许可证**：只保留 CC-BY 视频，使用和发布数据时按 `meta.json` 里的频道和链接署名，并遵守 YouTube 服务条款。
+
 ## 文档
 
 | 文件 | 内容 |
@@ -54,7 +123,7 @@ bash tests/regression_A.sh                        # 改代码后：A 组回归�
 
 ## 交接须知
 
-- **权限**：仓库是私有的，在 GitHub 的 Settings → Collaborators 添加协作者。
+- **权限**：仓库是公开的，任何人都能 clone；要推送权限，在 GitHub 的 Settings → Collaborators 添加协作者。
 - **不在 git 里的东西**：模型权重、数据、结果都在 `$ANNO_ROOT/{cache,data,outputs}`，清单见 `docs/WEIGHTS_DATA.md`。回归测试还需要 `outputs/evolution/`（E3、E3b、E8、E9 逐段结果）和 `outputs/bench/eval3d_A/`（GT 与 ViPE 结果）作为参考值，换机器时一起拷贝。
 - **路径**：旧脚本写死了 `/data/home/z00533370`，clone 到别处后先跑 `tools/relocate.py`。
 - **运行位置**：默认在容器 `z00533370_dev`（镜像 `z00533370/vipe:cu128`）里跑，`ANNO_CONTAINER=` 设为空则在宿主机跑；GPU 自动挑空闲卡，每进程限 4 线程（`pipeline/common.sh`）。
