@@ -272,6 +272,65 @@ class Worker(unittest.TestCase):
         for k in kids:
             self.assertFalse(alive(int(k)), "an orphaned GLRMap child is still running")
 
+    def test_thread_caps_and_cpu_list_reach_the_glrmap_command(self):
+        probe = ("printf '%s %s %s %s' \"$OMP_NUM_THREADS\" \"$MKL_NUM_THREADS\" \"$OPENBLAS_NUM_THREADS\" \"$NUMEXPR_NUM_THREADS\" > {out}/threads; "
+                 "grep Cpus_allowed_list /proc/self/status > {out}/cpus; " + stub("good"))
+        r = run(self.jd, "--mode=split", env={"GLR_STAGE1_CMD": probe, "ANNO_THREADS": "3", "GLR_TASKSET": CPU0, "GLR_ALLOW_UNCAPPED": None})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d, j = self.result()
+        self.assertEqual((d / "threads").read_text(), "3 3 3 3")
+        self.assertEqual((d / "cpus").read_text().split()[-1], CPU0)
+        self.assertEqual((j["threads"], j["taskset"]), (3, CPU0))
+
+    def test_mono_run_that_finishes_but_fails_the_gate_is_complete_gate_stop(self):
+        r = run(self.jd, "--mode=mono", env={"GLR_RUN_CMD": f"STUB_PLANAR=1 bash {HERE}/_stub_run_all.sh"})
+        self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
+        d, j = self.result()
+        self.assertEqual((j["status"], j["gate"], j["dense_ran"]), ("complete_gate_stop", "stop", True))      # the dense stage did run (mono)
+        self.assertIn("planar_or_panoramic_pairs", json.loads((d / "gate.json").read_text())["stop"])
+
+    def test_failing_commands_and_the_exit_codes(self):
+        r = run(self.jd, "--mode=mono", env={"GLR_RUN_CMD": "exit 1"})
+        self.assertEqual(r.returncode, 5)
+        self.assertEqual(self.result()[1]["status"], "failed")
+        r = run(self.jd, "--mode=split", env={"GLR_STAGE1_CMD": stub("good"), "GLR_DENSE_CMD": "exit 1"})
+        self.assertEqual(r.returncode, 5, r.stdout + r.stderr)
+        d, j = self.result()
+        self.assertEqual((j["status"], j["gate"], j["dense_ran"]), ("failed", "ok", False))
+        self.assertEqual([t["rc"] for t in j["timing"]], [0, 1])
+
+    def test_force_from_the_environment_is_recorded_and_the_gate_sees_the_job_frame_count(self):
+        env = {"GLR_STAGE1_CMD": stub("few"), "GLR_DENSE_CMD": "touch {out}/dense_marker"}
+        r = run(self.jd, "--mode=split", env=env)                                       # 10 of 30 frames registered: the gate counts the job's frames
+        self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
+        d, j = self.result()
+        self.assertIn("registered_lt_half", json.loads((d / "gate.json").read_text())["stop"])
+        self.assertEqual((j["n_frames"], j["force"]), (30, False))
+        r = run(self.jd, "--mode=split", env=dict(env, GLR_FORCE="1"))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d, j = self.result()
+        self.assertEqual((j["status"], j["force"], j["gate"]), ("complete", True, "stop"))
+        self.assertTrue((d / "dense_marker").exists())
+
+    def test_the_gate_looks_at_the_shallowest_model_and_result_json_says_which(self):
+        r = run(self.jd, "--mode=split", env={"GLR_STAGE1_CMD": stub("two_models")})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d, j = self.result()
+        self.assertEqual(j["gate_model"], "stage1/sparse/0")
+        self.assertEqual(j["gate"], "ok")                                               # the deeper 300-point model would have been a points_per_image stop
+
+    def test_camera_model_mask_dir_and_cameras_file(self):
+        r = run(self.jd, "--mode=split", "--dry-run", env={"GLR_CAMERA_MODEL": "SIMPLE_PINHOLE"})
+        self.assertIn("--camera-model SIMPLE_PINHOLE", r.stdout)
+        (self.jd / "masks").mkdir()
+        r = run(self.jd, "--mode=mono", env={"GLR_RUN_CMD": 'mkdir -p "$OUTPUT"; echo "$MASK_DIR" > "$OUTPUT/mask_dir"; bash ' + f"{HERE}/_stub_run_all.sh"})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d, _ = self.result()
+        self.assertEqual((d / "run" / "mask_dir").read_text().strip(), str(self.jd.resolve() / "masks"))
+        z = __import__("numpy").load(d / "cameras.npz")                                 # the gate also stores the cameras of the model it checked
+        self.assertEqual(len(z["names"]), 30)
+        self.assertEqual((int(z["W"]), int(z["H"])), (640, 360))
+
     def test_broken_symlink_images_and_missing_python_fail_early(self):
         (self.jd / "images" / "000001.jpg").unlink()
         (self.jd / "images" / "000001.jpg").symlink_to("/nonexistent/host/frame.jpg")

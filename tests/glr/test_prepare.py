@@ -49,6 +49,59 @@ class Route(unittest.TestCase):
         self.assertEqual(P.route_clip(s, CFG, True, force="glr")[0], "glr")
 
 
+class RouteRules(unittest.TestCase):
+    def scores(self, **vlm):
+        s = json.loads(json.dumps(GOOD))
+        s["vlm_qwen3vl_32b"].update(vlm)
+        return s
+
+    def test_forcing_never_resurrects_a_filter_reject(self):
+        self.assertEqual(P.route_clip(GOOD, CFG, False, force="glr")[0], "reject")
+        self.assertEqual(P.route_clip(GOOD, CFG, True, force="v13")[0], "v13")
+        cfg = C.load_cfg(None)
+        cfg["route"]["force"] = "v13"
+        self.assertEqual(P.route_clip(GOOD, cfg, True)[0], "v13")
+        self.assertEqual(P.route_clip(GOOD, cfg, False)[0], "reject")
+
+    def test_vlm_dynamic_levels_and_scene_categories(self):
+        for lvl, want in (("none", "glr"), ("low", "glr"), ("medium", "v13"), ("high", "v13")):
+            self.assertEqual(P.route_clip(self.scores(dynamic_level=lvl), CFG, True)[0], want, lvl)
+        for cat, want in (("indoor_static", "glr"), ("outdoor_static", "glr"), ("other", "glr"), ("driving", "v13"), ("embodied", "v13"),
+                          ("indoor_dynamic", "v13"), ("outdoor_dynamic", "v13")):
+            self.assertEqual(P.route_clip(self.scores(scene_category=cat), CFG, True)[0], want, cat)
+
+    def test_the_vlm_tag_selects_the_block(self):
+        s = {"vlm_a": {"scene_category": "driving"}, "vlm_b": {"scene_category": "indoor_static"}}
+        self.assertEqual(P.route_clip(s, CFG, True, vlm_tag="a")[0], "v13")
+        self.assertEqual(P.route_clip(s, CFG, True, vlm_tag="b")[0], "glr")
+        self.assertEqual(P.vlm_block(s, "zzz"), s["vlm_a"])                     # unknown tag: the first block, never a crash
+        self.assertEqual(P.vlm_block({}, None), {})
+
+    def test_thresholds_are_the_configured_ones(self):
+        for key, val, reason in (("dyn_frac", 0.30, "dynamic"), ("rot_frac", 0.60, "rotation_dominant")):
+            s = json.loads(json.dumps(GOOD))
+            s["flow"][key] = val                                                # exactly at the threshold: not over it
+            self.assertEqual(P.route_clip(s, CFG, True)[0], "glr", key)
+            s["flow"][key] = val + 0.01
+            self.assertIn(reason, P.route_clip(s, CFG, True)[1])
+
+
+class KPrior(unittest.TestCase):
+    def test_median_of_the_image_only_k_sources(self):
+        with tempfile.TemporaryDirectory() as td:
+            b = Path(td)
+            (b / "geocalib").mkdir()
+            (b / "geocalib" / "c.json").write_text(json.dumps({"hfov": 50.0}))
+            for m, hfov in (("pi3x", 60.0), ("da3", 90.0)):
+                (b / m / "c").mkdir(parents=True)
+                f = 160 / np.tan(np.radians(hfov / 2))                           # depth maps 320 px wide -> the HFOV comes from the depth width
+                np.savez(b / m / "c" / "pred.npz", K=np.tile(np.array([[f, 0, 160], [0, f, 90], [0, 0, 1]]), (5, 1, 1)), depth=np.ones((5, 180, 320), np.float32))
+            kp = P.k_prior(b, "c")
+            self.assertAlmostEqual(kp["hfov_deg"], 60.0, places=3)               # median, not mean (66.7)
+            self.assertEqual(set(kp["sources"]), {"geocalib", "pi3x", "da3"})
+            self.assertIsNone(P.k_prior(b, "nothing"))
+
+
 class Stride(unittest.TestCase):
     def test_default_without_flow(self):
         self.assertEqual(P.choose_stride(180, None, CFG), 2)
@@ -136,6 +189,22 @@ class Files(unittest.TestCase):
             r2 = run("jobs")
             self.assertIn("exists, skipped", r2.stdout)  # never overwritten
             self.assertEqual(sorted(p.name for p in (out / "glr_jobs").iterdir()), ["a"])   # no temporary directory left behind
+
+    def test_glr_all_never_resurrects_rejects_and_flow_statistics_set_the_stride(self):
+        import cv2
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td)
+            slow = {**GOOD, "flow": {**GOOD["flow"], "mag_median_frac": 0.006}}
+            bad = {**GOOD, "flow": {**GOOD["flow"], "rot_frac": 0.95}}
+            make_out(out, [("slow", slow, "pass"), ("rot", bad, "pass"), ("rej", GOOD, "reject")])
+            self.assertEqual(json.loads(prep(out, "route", "--glr-all").stdout.strip().splitlines()[-1]), {"reject": 1, "glr": 2, "v13": 0})
+            self.assertEqual(prep(out, "jobs", "--copy", "--clips", "slow").returncode, 0)
+            self.assertEqual(sorted(p.name for p in (out / "glr_jobs").iterdir()), ["slow"])               # --clips restricts the jobs
+            job = json.loads((out / "glr_jobs" / "slow" / "job.json").read_text())
+            self.assertEqual((job["stride"], len(job["frame_idx"]), job["frame_idx"][:3]), (3, 60, [0, 3, 6]))   # 0.2 % of the width per frame -> stride 3
+            im = out / "glr_jobs" / "slow" / "images" / "000002.jpg"
+            self.assertFalse(im.is_symlink())                                                                # --copy: real files
+            self.assertEqual(int(cv2.imread(str(im))[0, 0, 0]), 3 % 255)                                     # the 2nd image is clip frame 3
 
     def test_one_bad_clip_does_not_block_the_others_and_leaves_no_half_job(self):
         import shutil

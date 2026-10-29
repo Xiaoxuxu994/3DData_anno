@@ -8,12 +8,14 @@ therefore independent of the GLRMap code; it needs pycolmap (a GLRMap requiremen
 
 Usage (library):  summarize_model(dir) / summarize_db(db) / gate(model, db, n_frames, cfg) / load_cameras(dir)
 Usage (CLI):      python glr_stage1_gate.py MODEL_DIR DATABASE N_FRAMES [--cfg configs/pipeline_glr_v0.yaml] [--witness-hfov DEG]
-                                            [--job job.json] [--require-db] [--write gate.json]
+                                            [--job job.json] [--require-db] [--write gate.json] [--write-cameras cameras.npz]
                   prints the JSON verdict; exit code 0 = ok, 1 = suspect, 3 = stop (same code as the NPU camera_sanity gate),
                   4 = the gate itself failed (verdict "error": pycolmap missing, unreadable database, unsupported camera model ...).
                   An error is never an "ok": callers must treat any exit code other than 0 / 1 / 3 - and any run that printed no
                   JSON verdict - as a failed gate (glr_worker.sh and glr_collect.py do). --write also stores the compact
-                  verdict (gate dict + model + db summaries) in a file, for errors too.
+                  verdict (gate dict + model + db summaries) in a file, for errors too. --write-cameras stores the registered
+                  cameras of the model the gate looked at (names, c2w, K, W, H, model) as an .npz, so that glr_collect.py (phase c,
+                  often an environment without pycolmap) can build the label without reading the COLMAP model again.
 
 Signals (all computed from stage-1 output only; thresholds live in configs/pipeline_glr_v0.yaml, provisional until the
 Phase-0 replay in docs/GLR_INTEGRATION.md has been run on the stage-1 corpus):
@@ -271,6 +273,7 @@ def main(argv=None):
     ap.add_argument("--job", help="job.json written by glr_prepare.py: thresholds (stage1_gate_cfg) and the K witness (k_prior)")
     ap.add_argument("--require-db", action="store_true", help="a missing database is an error (verdict 'error', exit 4), not a skipped check")
     ap.add_argument("--write", help="also write the compact verdict (gate dict + model + db) to this file; written for errors too")
+    ap.add_argument("--write-cameras", help="also write the registered cameras of the model (names, c2w, K, W, H, model) to this .npz")
     a = ap.parse_args(argv)
     out = {"model": None, "db": None, "gate": None}
     try:
@@ -288,6 +291,9 @@ def main(argv=None):
             raise ValueError("database has no verified image pairs (two_view_geometries is empty): the planar / panoramic check cannot run")
         v = gate(m, d, a.n_frames, cfg, wit)
         out = {"model": m, "db": d, "gate": v}
+        if a.write_cameras:
+            cams = load_cameras(a.model_dir)
+            np.savez(a.write_cameras, names=np.array(cams["names"]), c2w=cams["c2w"], K=cams["K"], W=cams["W"], H=cams["H"], model=str(cams["model"]))
     except Exception as e:  # noqa: BLE001  - any failure of the gate itself must be visible, never read as "ok"
         out["gate"] = {"verdict": "error", "stop": [], "suspect": [], "signals": {}, "error": f"{type(e).__name__}: {e}"[:500]}
     print(json.dumps(out, indent=1, default=float))

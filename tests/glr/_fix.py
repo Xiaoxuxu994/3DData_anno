@@ -19,6 +19,20 @@ def look_at_rig(n=20, step=0.2, curve=0.0):
     return T
 
 
+def rotated_rig(n=12, step=0.25, yaw_deg=15.0, world=(20.0, -35.0, 50.0), offset=(4.0, -2.0, 7.0)):
+    """c2w (n,4,4) of a rig that translates along +x while yawing +-yaw_deg, expressed in an arbitrary world frame (rotation `world` in degrees
+    about x, y, z and a translation): nothing is the identity, unlike look_at_rig. Returns (c2w, W0) with W0 the 4x4 world transform, so that
+    scene points X of look_at_rig's frame become (W0 @ [X, 1])."""
+    from scipy.spatial.transform import Rotation
+    base = look_at_rig(n, step)
+    for i in range(n):
+        base[i, :3, :3] = Rotation.from_euler("y", yaw_deg * np.sin(2 * np.pi * i / max(n - 1, 1)), degrees=True).as_matrix()
+    W0 = np.eye(4)
+    W0[:3, :3] = Rotation.from_euler("xyz", world, degrees=True).as_matrix()
+    W0[:3, 3] = offset
+    return np.einsum("ij,njk->nik", W0, base), W0
+
+
 def scene_points(n=3000, seed=0, depth=(3.0, 12.0)):
     rng = np.random.default_rng(seed)
     X = np.c_[rng.uniform(-6, 10, n), rng.uniform(-3, 3, n), rng.uniform(*depth, n)]

@@ -153,7 +153,7 @@ run_gate() {  # run_gate MODEL_DIR -> $RES/gate.json ; sets GATE = ok | suspect 
   base=$(dirname "$(dirname "$model")")
   db=$base/database.db
   [ -f "$db" ] || db=$(find "$base" -maxdepth 2 -name database.db -print -quit 2> /dev/null)
-  "$PY" "$HERE/glr_stage1_gate.py" "$model" "$db" "$NFR" --job "$JOB/job.json" --require-db --write "$RES/gate.json" \
+  "$PY" "$HERE/glr_stage1_gate.py" "$model" "$db" "$NFR" --job "$JOB/job.json" --require-db --write "$RES/gate.json" --write-cameras "$RES/cameras.npz" \
     > "$RES/gate_full.json" 2> "$RES/logs/gate.log"
   grc=$?
   v=$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["verdict"])' "$RES/gate.json" 2> /dev/null | tr -cd 'a-z_' | head -c 20)

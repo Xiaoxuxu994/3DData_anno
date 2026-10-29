@@ -61,6 +61,29 @@ def _frame_no(name):
     return int(sorted(runs, key=len)[-1]) if runs else None
 
 
+class MissingDependency(RuntimeError):
+    """The environment cannot read what the job needs (no cameras.npz and no pycolmap): not a property of one clip, so the run stops."""
+
+
+def load_cameras(res):
+    """Registered cameras of a result directory: cameras.npz (written by the stage-1 gate on the worker host from the very model it
+    checked - no pycolmap needed here) or, failing that, the COLMAP model itself (needs pycolmap). -> (cams dict like G.load_cameras, source)."""
+    npz = Path(res) / "cameras.npz"
+    if npz.exists():
+        z = np.load(npz)
+        return {"names": [str(x) for x in z["names"]], "c2w": z["c2w"], "K": z["K"], "W": int(z["W"]), "H": int(z["H"]),
+                "model": str(z["model"])}, "cameras_npz"
+    mdir = find_model_dir(res)
+    if mdir is None:
+        return None, "no_sparse_model"
+    try:
+        import pycolmap  # noqa: F401
+    except ImportError as e:
+        raise MissingDependency(f"{res}: no cameras.npz and pycolmap cannot be imported ({e}); run phase c with the GLRMap python (PY_GLR), "
+                                f"or use a worker whose gate writes cameras.npz") from e
+    return G.load_cameras(mdir), "colmap_model"
+
+
 def find_model_dir(res):
     """The sparse model the stage-1 gate looked at (result.json: gate_model), else the shallowest sparse/<k>/cameras.* (ties by name) -
     the same rule as glr_worker.sh, so the label and the gate verdict always describe the same model."""
@@ -136,10 +159,9 @@ def read_glr(res, job, label_long=512):
     """-> dict(ok, why, names, k_idx, frame_idx, c2w (first camera = origin), K (frame grid), W, H, depth (n,h,w) on the label grid | None,
               K_label, depth_source, conf, n_reg)"""
     res = Path(res)
-    mdir = find_model_dir(res)
-    if mdir is None:
+    cams, src = load_cameras(res)
+    if cams is None:
         return {"ok": False, "why": "no_sparse_model"}
-    cams = G.load_cameras(mdir)
     if not len(cams["names"]):
         return {"ok": False, "why": "no_registered_images"}
     names_job = job["image_names"]
@@ -163,7 +185,7 @@ def read_glr(res, job, label_long=512):
     W, H = cams["W"], cams["H"]
     out = {"ok": True, "why": "", "names": [names_job[k] for k in k_idx], "k_idx": k_idx, "frame_idx": frame_idx, "c2w": c2w, "K": K,
            "W": W, "H": H, "model": cams["model"], "n_reg": int(len(k_idx)), "depth": None, "K_label": K, "depth_source": "none",
-           "conf": None, "mapped_by": mapped_by, "n_unmapped": n_unmapped, "n_depth_resized": 0}
+           "conf": None, "mapped_by": mapped_by, "n_unmapped": n_unmapped, "n_depth_resized": 0, "cameras_from": src}
     maps, src, out["n_depth_resized"] = read_depth_maps(res, [k + 1 for k in k_idx])
     if maps:
         h0, w0 = next(iter(maps.values())).shape
@@ -300,6 +322,7 @@ def qc_one(job, glr, stage1, wit, cfg):
           "scale": {k_: sc.get(k_) for k_ in ("k", "k_depth", "k_traj", "s_vipe", "r_vipe")}, "stage1": s1,
           "glr": {"n_reg": glr["n_reg"], "n_sampled": len(job["frame_idx"]), "stride": job.get("stride"), "model": glr.get("model"),
                   "depth_source": glr["depth_source"], "depth_cov": depth_cov, "hfov": hf, "mapped_by": glr.get("mapped_by", "name"),
+                  "cameras_from": glr.get("cameras_from", ""),
                   "n_unmapped": glr.get("n_unmapped", 0), "n_depth_resized": glr.get("n_depth_resized", 0)}}
     nan11 = np.full((n, 1, 1), np.nan, np.float32)
     label = {"c2w": cs, "K": glr["K_label"], "depth": Dm if Dm is not None else nan11,
@@ -431,6 +454,8 @@ def main(argv=None):
         clip = json.loads((jd / "job.json").read_text())["clip"]
         try:
             qc = collect_clip(out, jd, cfg, a.witness_dir)
+        except MissingDependency as e:
+            sys.exit(f"glr_collect: {e}")
         except Exception as e:  # noqa: BLE001
             qc = {"clip": clip, "annotator": "glr", "accept": False, "tier": "T3", "v1c": float("nan"),
                   "reject_reasons": ["collect_error"], "error": repr(e)[:300]}
