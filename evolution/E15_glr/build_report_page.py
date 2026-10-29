@@ -294,6 +294,7 @@ def build(a):
     easy = [c for c in man if c["role"] == "easy"]
     ctl = [c for c in man if c["role"] == "control_negative"]
     ids_e, ids_c = [c["id"] for c in easy], [c["id"] for c in ctl]
+    n_local = sum(1 for c in ctl if c.get("local_only"))
     v0 = lambda c: by.get(c, {}).get("v0a")  # noqa: E731
 
     # ---- numbers
@@ -394,7 +395,7 @@ def build(a):
 
 <section id="sum"><h2>结论<small>number first, then what it means</small></h2>
 <div class="kpis">
-<div class="kpi"><b>{len(easy)} + {len(ctl)}</b><span>条片段：简单网络视频 + 硬对照（均为许可证允许的来源，清单见 manifest）</span></div>
+<div class="kpi"><b>{len(easy)} + {len(ctl)}</b><span>条片段：简单网络视频 + 硬对照{('（' + str(n_local) + ' 条对照因许可证只在本地试过，不进 manifest）') if n_local else ''}</span></div>
 <div class="kpi {'good' if f_easy else ''}"><b>{(str(fe_pass) + ' / ' + str(len(f_easy))) if f_easy else '—'}</b><span>简单片段通过前端（规则 + VLM 替身）</span></div>
 <div class="kpi {'good' if f_ctl else ''}"><b>{(str(fc_caught) + ' / ' + str(len(f_ctl))) if f_ctl else '—'}</b><span>硬对照没能变成 GLR 标签（被规则、VLM、路由或关口挡住）</span></div>
 <div class="kpi warn"><b>{len(e_pass)} / {len(e_rows)}</b><span>简单片段通过第一阶段出口关口（复刻 v0a）</span></div>
@@ -434,7 +435,7 @@ def build(a):
 <li><b>mk_3110</b> 当初按“横移滑轨、视差最好”选入，独立核验发现是纯摇镜（旋转模型残差 0.013×光流，三角化角 1.3°），已改作无视差对照。光流里的视差代理分不开摇镜和平移，所以另外加了旋转模型视差指数：{('纯摇镜 ≤ ' + num(max(pans), 2) + '，' + str(len(t_easy_par)) + ' 条简单片段 ≥ ' + num(min(t_easy_par), 2)) if pans and t_easy_par else '待补'}。</li>
 <li><b>ia_telangana</b> 带一条淡水印（不透明度约 0.2–0.3，占画面 0.5 %，全程固定），接触表分辨率下看不见；保留为“水印探针”。</li>
 <li>39 条 Mixkit 记录的作者字段写成“无署名”是错的（页面标记里有贡献者链接），已按页面重取；CC0 的 ia_telangana 是上传者自述。</li>
-<li>没有许可证干净的<b>鱼眼</b>对照；另有 5 条“仅限个人使用”的对照只在本地试过，不进 manifest。</li></ul>
+<li>许可证干净的对照里没有<b>鱼眼</b>；{n_local} 条“仅限个人使用”的对照（含 2 条鱼眼）只在本地试过，不进 manifest，不展示画面。</li></ul>
 <h3>简单片段</h3><div class="gal">{gal_e}</div>
 <h3>硬对照</h3><div class="gal">{gal_c}</div>
 <p class="note">缩略图是各片段第 90 帧；CC BY / CC BY-SA 的片段只列文字，避免带出署名 / 相同方式共享的义务。</p></section>
