@@ -1,5 +1,5 @@
 """build_report_page.py OUT_HTML --sweep sweep_runs.csv --manifest E15_ood_manifest.json [--funnel funnel.csv] [--parallax parallax_index.jsonl]
-        [--figs DIR] [--frames-root RUN/bench/frames] [--demo demo_summary.json] [--stats E15_stats.json] [--fragment OUT_FRAGMENT.html]
+        [--figs DIR] [--frames-root RUN/bench/frames] [--demo demo_summary.json] [--stats E15_stats.json] [--fragment OUT_FRAGMENT.html] [--md OUT.md]
 
 Builds the self-contained summary page of the E15 sandbox test (Chinese): tables and figures come from the CSV / json outputs of the other scripts in this
 directory, the numbers in the prose are computed from them, so re-running after new results refreshes the whole page. Everything is inlined (CSS, PNG
@@ -14,6 +14,7 @@ import html
 import io
 import json
 import statistics
+from html.parser import HTMLParser
 from pathlib import Path
 
 REPO_URL = "https://github.com/Xiaoxuxu994/3ddata_anno/blob/e15-glr-track"
@@ -70,7 +71,7 @@ def figure(figs, name, cap, alt):
     p = Path(figs) / name if figs else None
     if not p or not p.exists():
         return f'<p class="pending">图 {esc(name)} 还没有生成（数据未齐）。</p>'
-    return f'<figure><img src="{b64(p, "image/png")}" alt="{esc(alt)}" loading="lazy"><figcaption>{cap}</figcaption></figure>'
+    return f'<figure><img src="{b64(p, "image/png")}" alt="{esc(alt)}" data-file="{esc(name)}" loading="lazy"><figcaption>{cap}</figcaption></figure>'
 
 
 CSS = """
@@ -144,6 +145,135 @@ ul.tight{margin:6px 0;padding-left:1.3em}ul.tight li{margin:3px 0}
 footer{margin-top:48px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:16px}
 @media (max-width:560px){body{font-size:14.5px}.kpi b{font-size:26px}}
 """
+
+
+class _MD(HTMLParser):
+    """The subset of HTML this page uses -> GitHub Markdown (pipe tables, figures linked from fig_dir, badges as plain text, no thumbnails)."""
+
+    def __init__(self, fig_dir):
+        super().__init__(convert_charrefs=True)
+        self.out, self.fig_dir = [], fig_dir
+        self.stack, self.skip, self.row, self.cell, self.rows, self.in_table = [], 0, None, None, [], False
+        self.list_stack = []
+
+    def w(self, t):
+        if self.cell is not None:
+            self.cell.append(t)
+        else:
+            self.out.append(t)
+
+    def handle_starttag(self, tag, at):
+        at = dict(at)
+        cls = at.get("class", "") or ""
+        if tag in ("style", "title", "script", "nav") or "gal" in cls.split() or "ph" in cls.split():
+            self.skip += 1
+            self.stack.append((tag, True))
+            return
+        self.stack.append((tag, False))
+        if self.skip:
+            return
+        if tag == "h1":
+            self.w("\n# ")
+        elif tag == "h2":
+            self.w("\n\n## ")
+        elif tag == "h3":
+            self.w("\n\n### ")
+        elif tag == "small":
+            self.w(" _(")
+        elif tag in ("p", "figure") or (tag == "div" and "kpis" in cls) or (tag == "div" and "find" in cls):
+            self.w("\n\n")
+        elif tag == "div" and ("kpi" in cls.split() or tag == "div" and self.stack and False):
+            self.w("\n- ")
+        elif tag in ("ul", "ol"):
+            self.list_stack.append([tag, 0])
+            self.w("\n")
+        elif tag == "li":
+            kind = self.list_stack[-1] if self.list_stack else ["ul", 0]
+            kind[1] += 1
+            self.w("\n" + (f"{kind[1]}. " if kind[0] == "ol" else "- "))
+        elif tag in ("code",):
+            self.w("`")
+        elif tag in ("b", "strong"):
+            self.w("**")
+        elif tag == "a":
+            self.href = at.get("href", "")
+            self.w("[")
+        elif tag == "img":
+            f = at.get("data-file")
+            if f:
+                self.w(f"![{at.get('alt', '')}]({self.fig_dir}/{f})")
+        elif tag == "table":
+            self.rows, self.in_table = [], True
+        elif tag == "tr":
+            self.row = []
+        elif tag in ("td", "th"):
+            self.cell = []
+        elif tag == "summary":
+            self.w("\n\n**")
+        elif tag == "figcaption":
+            self.w("\n\n*")
+        elif tag == "br":
+            self.w(" ")
+
+    def handle_endtag(self, tag):
+        top = self.stack.pop() if self.stack else (tag, False)
+        if top[1]:
+            self.skip -= 1
+            return
+        if self.skip:
+            return
+        if tag == "small":
+            self.w(")_")
+        elif tag in ("code",):
+            self.w("`")
+        elif tag in ("b", "strong"):
+            self.w("**")
+        elif tag == "summary":
+            self.w("**\n")
+        elif tag == "a":
+            self.w(f"]({getattr(self, 'href', '')})")
+        elif tag in ("ul", "ol"):
+            if self.list_stack:
+                self.list_stack.pop()
+            self.w("\n")
+        elif tag in ("td", "th"):
+            txt = "".join(self.cell).replace("|", "\\|").replace("\n", " ").strip()
+            self.cell = None
+            self.row.append(txt)
+        elif tag == "tr":
+            self.rows.append(self.row)
+            self.row = None
+        elif tag == "table":
+            if self.rows:
+                head, body = self.rows[0], self.rows[1:]
+                self.out.append("\n\n| " + " | ".join(head) + " |\n|" + "|".join("---" for _ in head) + "|\n")
+                self.out.extend("| " + " | ".join(r) + " |\n" for r in body)
+            self.in_table = False
+        elif tag == "figcaption":
+            self.w("*\n")
+        elif tag == "p":
+            self.w("\n")
+
+    def handle_data(self, d):
+        if self.skip:
+            return
+        if self.cell is None and not d.strip():
+            return
+        import re
+        self.w(re.sub(r"\s+", " ", d))
+
+
+def html_to_md(fragment, fig_dir="figures"):
+    c = _MD(fig_dir)
+    c.feed(fragment)
+    import re
+    md = "".join(c.out)
+    md = re.sub(r"[ \t]*\n[ \t]*", "\n", md)          # whitespace around line breaks comes from the HTML source, not from the page
+    md = re.sub(r" {2,}", " ", md)
+    md = re.sub(r"\n{3,}", "\n\n", md).strip() + "\n"
+    # CommonMark does not close "**...**" before a CJK character when the text inside ends in punctuation: a space after the closing mark fixes that
+    md = re.sub(r"(\*\*[^*\n]+?\*\*)(?=[^\s.,;:)\]\-*，。；：、）])", r"\1 ", md)
+    return md
 
 
 def build(a):
@@ -379,11 +509,15 @@ def main(argv=None):
     ap.add_argument("--demo")
     ap.add_argument("--stats")
     ap.add_argument("--fragment")
+    ap.add_argument("--md", help="also write a GitHub-Markdown version (figures linked as <md-fig-dir>/<png>)")
+    ap.add_argument("--md-fig-dir", default="figures")
     a = ap.parse_args(argv)
     fragment, full = build(a)
     Path(a.out_html).write_text(full)
     if a.fragment:
         Path(a.fragment).write_text(fragment)
+    if a.md:
+        Path(a.md).write_text(html_to_md(fragment, a.md_fig_dir))
     print(f"wrote {a.out_html} ({len(full) / 1e6:.2f} MB)")
 
 
