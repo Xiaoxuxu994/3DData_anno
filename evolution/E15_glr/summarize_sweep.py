@@ -17,6 +17,7 @@ ok / suspect + not silver-accurate = silent error; gate stop + silver-accurate =
 import argparse
 import csv
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -65,7 +66,18 @@ def ate_pct(a, b):
     return float(100 * np.sqrt(((s * pa @ R.T + t - pb) ** 2).sum(1).mean()) / L), int(len(common))
 
 
-def row_for(clip, run, r, ref):
+def load_witness(pool, clip):
+    """GeoCalib's median focal / W of the clip (the only K witness the sandbox has) from POOL/<clip>/scores.json -> {focal_w, hfov (deg)} or None."""
+    if not pool:
+        return None
+    try:
+        fw = float(np.median(json.loads((Path(pool) / clip / "scores.json").read_text())["calib"]["focal_w"]))
+    except (OSError, KeyError, ValueError, TypeError):
+        return None
+    return {"focal_w": fw, "hfov": math.degrees(2 * math.atan(0.5 / fw))} if np.isfinite(fw) and fw > 0 else None
+
+
+def row_for(clip, run, r, ref, witness=None):
     res = r["res"]
     m, db = res.get("model") or {}, res.get("db") or {}
     n_img = db.get("n_images") or 0
@@ -78,6 +90,14 @@ def row_for(clip, run, r, ref):
     else:
         g = G.gate(m, db, n_img)
         row.update(verdict=g["verdict"], flags=";".join(g["stop"] + g["suspect"]))
+    if witness:
+        row.update(witness_focal_w=witness["focal_w"], witness_hfov=witness["hfov"])
+        if m:
+            row["kdis_deg"] = abs(m["hfov_deg"] - witness["hfov"])            # what the v1c K-disagreement part would see against this witness
+            gw = G.gate(m, db, n_img, witness_hfov=witness["hfov"])
+            row.update(verdict_w=gw["verdict"], flags_w=";".join(gw["stop"] + gw["suspect"]))
+        else:
+            row.update(verdict_w="stop", flags_w="no_model")
     if ref is not None and run != "ref":
         fr = (ref["res"].get("model") or {}).get("focal_w")
         if m and fr:
@@ -110,6 +130,7 @@ def main(argv=None):
     ap.add_argument("out_dir")
     ap.add_argument("--decisions", help="filter/decide.py output (clip, decision, reason ...), joined into the per-clip table")
     ap.add_argument("--manifest", help="docs/experiments/E15_ood_manifest.json: roles (easy / control_negative) and categories")
+    ap.add_argument("--pool", help="filter pool dir (POOL/<clip>/scores.json with the s5 GeoCalib stage): adds the K-witness columns and table E")
     ap.add_argument("--clips")
     a = ap.parse_args(argv)
     root, out = Path(a.s1_root), Path(a.out_dir)
@@ -128,7 +149,7 @@ def main(argv=None):
             ref = None
         for run, r in runs.items():
             if r is not None:
-                row = row_for(clip, run, r, ref)
+                row = row_for(clip, run, r, ref, load_witness(a.pool, clip))
                 row["role"] = (roles.get(clip) or {}).get("role", "")
                 rows.append(row)
     fields = list(dict.fromkeys(k for r in rows for k in r))
@@ -150,7 +171,8 @@ def main(argv=None):
     md.append(md_table(tab, cols))
     # --- B: variants vs reference
     md.append("\n### B. Camera-model / prior variants against the silver reference (focal error and ATE are vs `ref`)\n")
-    cols = ["variant", "runs", "registered >= 90 %", "gate ok/suspect", "silver-accurate", "silent errors", "false stops", "median abs f err %", "median ATE %"]
+    cols = ["variant", "runs", "registered >= 90 %", "gate ok/suspect", "silver-accurate", "silent errors", "of which kdis <= 13.2 deg", "false stops", "median abs f err %", "median ATE %"]
+    kmax = G.DEFAULT_CFG["max_witness_hfov_dis_deg"]
     tab = []
     for run in ("v0a", "v0b", "v1sp", "v2prior", "v3fixed", "v0a_hq960"):
         rs = [r for r in byrun(run, "easy" if roles else None) if "outcome" in r]
@@ -160,7 +182,10 @@ def main(argv=None):
         at = [r["ate_vs_ref_pct"] for r in rs if r.get("ate_vs_ref_pct") is not None and np.isfinite(r["ate_vs_ref_pct"])]
         tab.append({"variant": run, "runs": len(rs), "registered >= 90 %": sum((r["reg_frac"] or 0) >= REG_MIN for r in rs),
                     "gate ok/suspect": sum(r["verdict"] != "stop" for r in rs), "silver-accurate": sum(r["silver_accurate"] for r in rs),
-                    "silent errors": sum(r["outcome"] == "silent_error" for r in rs), "false stops": sum(r["outcome"] == "false_stop" for r in rs),
+                    "silent errors": sum(r["outcome"] == "silent_error" for r in rs),
+                    "of which kdis <= 13.2 deg": ("" if not any("kdis_deg" in r for r in rs) else
+                                                  sum(r["outcome"] == "silent_error" and r.get("kdis_deg") is not None and r["kdis_deg"] <= kmax for r in rs)),
+                    "false stops": sum(r["outcome"] == "false_stop" for r in rs),
                     "median abs f err %": f(float(np.median(fe)) if fe else None, 1), "median ATE %": f(float(np.median(at)) if at else None, 2)})
     md.append(md_table(tab, cols))
     # --- C: per clip variants
@@ -187,6 +212,27 @@ def main(argv=None):
             d = dec.get(r["clip"], {})
             tab.append({"clip": r["clip"], "category": (roles.get(r["clip"]) or {}).get("category", ""), "filter decision": (d.get("decision", "") + " " + d.get("reason", "")).strip(),
                         "reg": f"{r['n_reg']}/{r['n_img']}", "pts/img": f(r["pts_img"], 0), "planar": f(r["planar"]), "fx/fy": f(r["fx_fy"], 3), "gate": r["verdict"], "flags": r["flags"]})
+        md.append(md_table(tab, cols))
+    # --- E: three estimates of the focal length per clip (post-hoc, exploratory: not part of the pre-declared criteria)
+    if any("witness_focal_w" in r for r in rows):
+        md.append("\n### E. Focal length (f / W) three ways: replica fx, fy | silver reference | GeoCalib median (post-hoc, exploratory)\n")
+        cols = ["clip", "v0a fx", "v0a fy", "ref", "GeoCalib", "v0a vs ref %", "v0a vs GeoCalib %", "ref vs GeoCalib %", "who agrees (10 %)"]
+        tab = []
+        for clip in clips:
+            rr = {r["run"]: r for r in rows if r["clip"] == clip}
+            a_, rf = rr.get("v0a"), rr.get("ref")
+            if not a_ or not rf or a_.get("focal_w") is None or rf.get("focal_w") is None or a_.get("witness_focal_w") is None:
+                continue
+            fx, fy = a_["focal_w"], a_["focal_w"] / a_["fx_fy"]
+            fr, fg = rf["focal_w"], a_["witness_focal_w"]
+            worst = lambda x: max(abs(fx / x - 1), abs(fy / x - 1))  # noqa: E731
+            d_ar, d_ag, d_rg = worst(fr), worst(fg), abs(fr / fg - 1)
+            ok = lambda d: d <= F_MAX / 100  # noqa: E731
+            who = ("all three agree" if ok(d_ar) and ok(d_ag) and ok(d_rg) else "replica = GeoCalib, reference differs" if ok(d_ag) and not ok(d_ar) and not ok(d_rg)
+                   else "replica = reference, GeoCalib differs" if ok(d_ar) and not ok(d_ag) else "reference = GeoCalib, replica differs" if ok(d_rg) and not ok(d_ar)
+                   else "no two agree")
+            tab.append({"clip": clip, "v0a fx": f(fx, 3), "v0a fy": f(fy, 3), "ref": f(fr, 3), "GeoCalib": f(fg, 3), "v0a vs ref %": f(100 * d_ar, 0),
+                        "v0a vs GeoCalib %": f(100 * d_ag, 0), "ref vs GeoCalib %": f(100 * d_rg, 0), "who agrees (10 %)": who})
         md.append(md_table(tab, cols))
     (out / "tables.md").write_text("\n".join(md) + "\n")
     print("\n".join(md))

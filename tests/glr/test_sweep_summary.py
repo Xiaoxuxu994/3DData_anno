@@ -52,7 +52,11 @@ class SweepSummary(unittest.TestCase):
             K3[1, 1] = 555.0                                                              # fx right, fy +11 %: fx / fy = 0.901 stays under the gate's 10 % rule
             make_run(root, "good", "v0a_hq960", traj[f3], K3, nm(f3), 3, reuse=a)
             out = Path(td) / "out"
-            r = subprocess.run([sys.executable, str(REPO / "evolution" / "E15_glr" / "summarize_sweep.py"), str(root), str(out)], capture_output=True, text=True)
+            pool = Path(td) / "pool" / "good"
+            pool.mkdir(parents=True)
+            (pool / "scores.json").write_text(json.dumps({"calib": {"focal_w": [0.78125] * 5}}))             # GeoCalib: f / W = 500 / 640, the true K
+            r = subprocess.run([sys.executable, str(REPO / "evolution" / "E15_glr" / "summarize_sweep.py"), str(root), str(out), "--pool", str(Path(td) / "pool")],
+                               capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stderr)
             with open(out / "sweep_runs.csv") as fh:
                 rows = {x["run"]: x for x in csv.DictReader(fh)}
@@ -72,10 +76,17 @@ class SweepSummary(unittest.TestCase):
             self.assertAlmostEqual(float(rows["v0a_hq960"]["focal_err_pct"]), 11.0, places=1)
             self.assertEqual(rows["v0a_hq960"]["outcome"], "silent_error")                # fy is 11 % off although fx is exact
             self.assertEqual(rows["ref"]["outcome"], "")                                   # the reference is not scored against itself
+            self.assertAlmostEqual(float(rows["v0a"]["kdis_deg"]), 0.0, places=2)           # K witness columns (GeoCalib, post-hoc table E)
+            self.assertAlmostEqual(float(rows["v3fixed"]["kdis_deg"]), 12.5, places=0)      # focal +30 %: 12.5 deg HFOV apart, under the 13.2 deg rule ...
+            self.assertEqual(rows["v3fixed"]["verdict_w"], "ok")                            # ... so the witness does not catch this silent error either
+            self.assertEqual(rows["v3fixed"]["outcome"], "silent_error")
             md = (out / "tables.md").read_text()
             self.assertIn("### A.", md)
             self.assertIn("### B.", md)
             self.assertIn("### C.", md)
+            self.assertIn("### E.", md)
+            self.assertIn("| good | 0.781 | 0.781 | 0.781 | 0.781 | 0 | 0 | 0 | all three agree |", md)
+            self.assertIn("of which kdis <= 13.2 deg", md)
 
 
 if __name__ == "__main__":
