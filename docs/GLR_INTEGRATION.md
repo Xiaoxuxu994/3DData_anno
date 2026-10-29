@@ -19,12 +19,13 @@
           │                                                              第一阶段(COLMAP SIFT + 顺序匹配 + 全局 SfM)
           │                                                              → 出口关口 glr_stage1_gate.py（stop 就不跑 RoMa/PDA）
           │                                                              → 稠密阶段（RoMa v2 三角化 + Pi3X + PDA）
-          │   rsync -a OUT/glr_jobs/*/result*  ◀───────────────────────  result*/{stage1|run, gate.json, result.json}
+          │   rsync -a OUT/glr_jobs/  ◀────────────────────────────────  result*/{stage1|run, gate.json, result.json} + RESULT_DIR
+          │   （拷整个 glr_jobs 目录：RESULT_DIR 指针最后写，是“作业已完成”的标志）
           ▼  (c) glr_collect.py   GLR 结果 → 标签契约（c2w、K、depth、conf、scale…）+ 跨模型证人质检 v1c + 分级 T1/T2/T3
              glr_merge.py         每段一个最终判定：GLR 标签 / 回退 v1.3 标签 / 拒绝
 ```
 
-一台机器就够时：`pipeline/run_batch_glr.sh OUT a.mp4 b.mp4 ...`（`--phase=all`）。两台机器时：H200 上 `--phase=a`，把 `OUT/glr_jobs` 拷到 GLRMap 机器跑 `glr_worker.sh`（或在那边 `--phase=b`），结果拷回后 `--phase=c`。
+一台机器就够时：`pipeline/run_batch_glr.sh OUT a.mp4 b.mp4 ...`（`--phase=all`）。两台机器时：H200 上 `--phase=a`，把 `OUT/glr_jobs` 拷到 GLRMap 机器跑 `glr_worker.sh`（或在那边 `--phase=b`，同一个 OUT 路径），整个 `glr_jobs` 拷回后 `--phase=c`（`--phase=c` / `--phase=a` 不需要再给输入视频）。`--phase=b` 按 `RESULT_DIR`+`result.json` 判断作业是否完成：被打断或没写完的作业会重跑（新目录），失败的作业默认不自动重跑（`--glr-retry` 才重跑）。
 
 ## 2. 新增文件（现有脚本一个都没改）
 
@@ -32,8 +33,8 @@
 |---|---|
 | `pipeline/run_batch_glr.sh` | 总入口：先调用原样的 `run_batch.sh`，再路由 → 作业包 → worker → 收集 → 合并。输出写进同一个 `OUT`，不覆盖 v1.3 的结果 |
 | `pipeline/glr_prepare.py` | 阶段 a：`route` 写 `filter/glr_route.csv`；`jobs` 写 `glr_jobs/<clip>/`。抽帧步长按光流统计选 |
-| `pipeline/glr_worker.sh` | 阶段 b（GLRMap 主机，自包含，只依赖 `glr_stage1_gate.py`）：跑 GLRMap + 出口关口，永不覆盖（`result`, `result_1`…） |
-| `pipeline/glr_stage1_gate.py` | 第一阶段出口关口：读稀疏模型 + `database.db`，给出 `ok / suspect / stop` 和全部信号；CLI 退出码 0/1/3 |
+| `pipeline/glr_worker.sh` | 阶段 b（GLRMap 主机，自包含，只依赖 `glr_stage1_gate.py`）：跑 GLRMap + 出口关口，永不覆盖（`result`, `result_1`…）。命令模板整体在 `taskset`/`timeout` 下用 `bash -c` 执行，占位符走环境变量（片段名里的空格、引号、`;`、`&` 只是数据）；收到 INT/TERM 会停掉整组 GLRMap 进程并记 `interrupted`；`result.json` 最先写、`RESULT_DIR` 最后写 |
+| `pipeline/glr_stage1_gate.py` | 第一阶段出口关口：读稀疏模型 + `database.db`，给出 `ok / suspect / stop` 和全部信号；CLI 退出码 0/1/3，**4 = 关口自己失败**（verdict `error`：pycolmap 缺失、数据库打不开、不支持的相机模型…），任何非 0/1/3 的退出码或没有 JSON 裁决都按失败处理，**绝不当作 ok**。焦距规则按长边 max(W,H) 算（COLMAP 默认焦距是 1.2×长边），竖屏片段与横屏一致 |
 | `pipeline/glr_collect.py` | 阶段 c：GLRMap 结果 → `labels_glr/<clip>.npz`、`qc_glr/<clip>.json`、`results_glr.csv` |
 | `pipeline/glr_merge.py` | 最终判定与回退策略 → `final/{results.csv, labels/, summary.json}` |
 | `pipeline/glr_common.py` | 配置、Umeyama、`traj_pct` / `depth_cmp`（`qc/qc_cross.py` 的拷贝）、E3b 尺度规则、网格工具 |
@@ -41,19 +42,19 @@
 | `tools/glr_gate_replay.py` | Phase 0.2：在已有的第一阶段输出上离线回放关口信号，对标签算捕获率 / 误拦率，判预注册通过线 |
 | `tools/filter_stage_cpu.py` | 在没有 GPU 的机器上原样运行 `filter/s*.py`（冒烟测试用，不是生产） |
 | `tools/stage1_sfm.py` | 用 pycolmap 复刻 GLRMap 第一阶段，带消融开关（相机模型、初始焦距、固定内参、种子）；不是 GLRMap 代码 |
-| `tests/glr/` | 单元测试（`python -m unittest discover -s tests/glr`，需要 numpy、scipy、opencv、pycolmap） |
+| `tests/glr/` | 单元测试（`python -m unittest discover -s tests/glr`，需要 numpy、scipy、opencv、pycolmap；`test_fidelity.py` 另需 pandas）。包括：把 `qc_cross`/`eval_vipe`/`eval3d_bench`/`e3_scale_vote`/`e9_hard_rules`/`v13_label_qc` 里被复制的函数用 `ast` 原样抽出来和拷贝逐项对拍 |
 
 ## 3. 标签与质检契约
 
-- `labels_glr/<clip>.npz`：与 v1.3 同名键 `c2w`（N,4,4，OpenCV，米；第一台注册相机为世界原点）、`K`（N,3,3，在深度网格上）、`depth`（N,h,w，米）、`conf`、`scale`、`k_depth`、`k_traj`、`hfov`、`k_source`、`frame_hw`；新增 `frame_idx`（每个标签帧在 15 fps 片段里的序号，**只有被抽到并注册成功的帧**）、`n_orig`、`annotator='glr'`、`tier`、`depth_source`（`pda_fine | pda_coarse | none`）。没有稠密深度时 `depth` 是 (N,1,1) 的 NaN，`K` 在原图分辨率上。
-- 米制尺度：GLRMap 是 SfM 任意尺度，按 E3b 规则对齐 ViPE：`k = sqrt(k_traj · k_depth)`；GLRMap 没有深度时只用轨迹尺度（不和中性 1.0 取几何平均）。
-- `qc_glr/<clip>.json`：v1c 三项（`xtraj_ba` 对 ViPE、`xdepth_k` 对“以 ViPE 相机为条件的 DA3”、`kdis` 对 GeoCalib/Pi3X/DA3 的 HFOV 中位数），阈值沿用 3.27 / 0.194 / 13.2°，加 E9 旗标 `jump60`、`fov_out`；另有 `tier`、`reject_reasons`、第一阶段关口详情、与 v1.3 标签的一致性 `agreement_v13`（信息项）。
-- 分级：**T3** 拒绝（v1c > 1 或不可检、`jump60`/`fov_out`、第一阶段关口 stop、GLRMap 失败）；**T1** 通过且三项都 ≤ 阈值的一半、第一阶段无 suspect、有稠密深度、注册帧 ≥ 90%；**T2** 其余通过的。**分级只说明“没有已知的失败特征被触发”，不等于精确**：证人（ViPE、Pi3X ≈ 0.65% ATE）比 GLRMap 好时的误差（0.05–0.2%）噪声大得多，这套关口只能抓粗错。
+- `labels_glr/<clip>.npz`：与 v1.3 同名键 `c2w`（N,4,4，OpenCV，米；第一台注册相机为世界原点）、`K`（N,3,3，在深度网格上）、`depth`（N,h,w，米）、`conf`、`scale`、`k_depth`、`k_traj`、`hfov`、`k_source`、`frame_hw`；新增 `frame_idx`（每个标签帧在 15 fps 片段里的序号，**只有被抽到并注册成功的帧**）、`n_orig`、`annotator='glr'`、`tier`、`depth_source`（`pda_fine | pda_coarse | none`）。没有稠密深度的结果违反标签契约，默认**拒绝**（`qc.allow_no_depth: false`，原因 `depth_missing`）；这种被拒标签里的 `depth` 是 (N,1,1) 的 NaN、`K` 在原图分辨率上，只用于排查。
+- 米制尺度：GLRMap 是 SfM 任意尺度，按 E3b 规则对齐 ViPE：`k = sqrt(k_traj · k_depth)`（有证据时与 `evolution/e3_scale_vote.py` 逐位一致，见 `test_fidelity.py`）。与 E3b 的差别只在 GLRMap 的标签可能缺深度：深度比从“实际有 GLRMap 深度的帧”里取 10 帧；没有深度比时 `k_depth = k_traj`（不和中性 1.0 取几何平均）；两种票都没有时 **`k = NaN`，标签以 `scale_unverified` 拒绝**（E3b 的中性 1.0 对 Pi3X 合理，对 SfM 任意尺度等于把无单位数当米导出）。
+- `qc_glr/<clip>.json`：v1c 三项（`xtraj_ba` 对 ViPE、`xdepth_k` 对“以 ViPE 相机为条件的 DA3”、`kdis` 对 GeoCalib/Pi3X/DA3 的 HFOV 中位数），阈值沿用 3.27 / 0.194 / 13.2°，加 E9 旗标 `jump60`、`fov_out`；另有 `tier`、`reject_reasons`、第一阶段关口详情、与 v1.3 标签的一致性 `agreement_v13`（信息项）。`jump20/jump60` 是在**相邻标签帧**（间隔 `stride` 个源帧）之间判的：stride 4 时平滑摇镜超过 225°/s 就会触发 `jump60`（v1.3 是 15 fps 相邻帧 900°/s）——有意不稀释，因为采样帧之间的位姿跳变不该被步长摊薄，而且路由对快镜头会选小步长。
+- 分级：**T3** 拒绝（v1c > 1；任一 v1c 分量或尺度算不出来；`jump60`/`fov_out`；第一阶段关口 stop / error / 缺失；没有 GLRMap 深度；GLRMap 失败、被打断或还没跑完）；**T1** 通过且三项**都有限**且 ≤ 阈值的一半、第一阶段关口 ok、深度覆盖 ≥ 90% 的标签帧、注册帧 ≥ 90%；**T2** 其余通过的（深度覆盖不足记 `depth_partial`）。GLR 轨道对“没检查到”比 v1.3 严格（`qc.require_gate / require_all_parts / allow_no_depth / min_depth_cov`）：GLRMap 的失败是静默的、主要是 K，`kdis` 算不出来（没有 K 证人）时标签被拒，而不是按 v1.3 那样只取剩下的分量。**分级只说明“没有已知的失败特征被触发”，不等于精确**：证人（ViPE、Pi3X ≈ 0.65% ATE）比 GLRMap 好时的误差（0.05–0.2%）噪声大得多，这套关口只能抓粗错。
 - 合并策略（`glr_merge.py`）：筛选拒 → 拒绝；路由 glr 且 T1/T2 → GLR 标签；路由 glr 但 T3/失败/被关口拦下 → 回退 v1.3 标签（v1c 通过才算）；路由 v13 → v1.3 标签。两种打标器失败机制不同（SfM 要视差和可观测的焦距；前馈要合理的 K），所以回退不是循环论证，但“二者互补”目前只是假设。
 
 ## 4. 遵守 AGENTS.md 第 3 节的地方
 
-只用空闲 GPU：新增代码本身不占 GPU（GLRMap 的 CUDA/NPU 部分由 GLRMap 自己的命令决定，用 GLRMap 主机上的卡调度）。线程：`ANNO_THREADS` 默认 4，`glr_worker.sh` 导出 `OMP/MKL/OPENBLAS/NUMEXPR_NUM_THREADS`；**GLOMAP 自己会开远多于设置的线程**（评估会话里 3 个窗口并发出现过 > 250 线程、负载到 200），共享主机上务必设 `GLR_TASKSET=<cpu 列表>`（`taskset -c`）硬限核数。不覆盖：worker 永远写新目录；`glr_prepare.py` 对已有作业包只跳过；`run_batch_glr.sh` 的 b 阶段跳过已有 `RESULT_DIR` 的作业。路径：新代码读 `ANNO_ROOT`（`glr_common.ROOT`），无写死路径；`PY_GLR` 指 GLRMap 环境的 python。没有 `pkill`。
+只用空闲 GPU：新增代码本身不占 GPU（GLRMap 的 CUDA/NPU 部分由 GLRMap 自己的命令决定，用 GLRMap 主机上的卡调度）。线程：`ANNO_THREADS` 默认 4，`glr_worker.sh` 导出 `OMP/MKL/OPENBLAS/NUMEXPR_NUM_THREADS`；**GLOMAP 自己会开远多于设置的线程**（评估会话里 3 个窗口并发出现过 > 250 线程、负载到 200），共享主机上务必设 `GLR_TASKSET=<cpu 列表>`（`taskset -c`）硬限核数。**`glr_worker.sh` 没有 `GLR_TASKSET` 就拒绝启动**（除非 `GLR_ALLOW_UNCAPPED=1`，只在整机归你时用），`taskset`/`timeout` 套在整个命令模板外，所以 `a && b`、`VAR=x cmd` 形式的模板也受限；`run_batch_glr.sh --phase=b` 会先检查并给出一次性报错。GPU：`--gpus=` 同时给 `run_batch.sh` 和 GLRMap worker（`CUDA_VISIBLE_DEVICES`），没给时 b 阶段用 `pick_gpus 1` 选一张空闲卡，没有空闲卡就不启动；NPU 主机没有 `nvidia-smi` 时不动设备变量，请自己设 `ASCEND_RT_VISIBLE_DEVICES`。不覆盖：v1.3 的所有输出和每个 GLRMap 结果目录（`result`, `result_1`…）永不覆盖；`glr_prepare.py` 对已有作业包只跳过（半成品作业包被改名移开，不删）；`results_glr.csv`、`qc_glr/`、`labels_glr/`、`final/` 是从上述输入**推导出来的视图**，每次阶段 c 重建（“再跑一次就是续跑”），`final/labels/` 里只有软链接（相对路径，整个 OUT 可以搬走），随最新判定改指或移除，从不碰标签文件本身。路径：新代码读 `ANNO_ROOT`（`glr_common.ROOT`），无写死路径；`PY_GLR` 指 GLRMap 环境的 python。没有 `pkill`；worker 被 INT/TERM 打断时按进程组停掉自己启动的 GLRMap 命令。
 
 ## 5. 已验证 / 未验证
 
@@ -65,10 +66,10 @@
 
 ## 6. 第一次在服务器上跑：核对清单
 
-1. GLRMap 主机：`export GLRMAP_HOME=<GLRMap 检出目录> PY_GLR=<GLRMap 环境的 python> ANNO_THREADS=8 GLR_TASKSET=<8 个核>`；`bash pipeline/glr_worker.sh JOB --dry-run` 看命令。
+1. GLRMap 主机：`export GLRMAP_HOME=<GLRMap 检出目录> PY_GLR=<GLRMap 环境的 python（要能 import numpy 和 pycolmap，worker 启动时检查）> ANNO_THREADS=8 GLR_TASKSET=<8 个核>`；`bash pipeline/glr_worker.sh JOB --dry-run` 看命令。作业包里的图片是软链接，拷到别的机器要用 `rsync -aL`（worker 会检查第一张图能不能读）。
 2. **mono 模式**（默认）直接跑 GLRMap 自带的 `data_generate_demo/run_all.sh`（它读 `IMAGES`、`OUTPUT`、可选 `MASK_DIR`）。如果你的副本带 NPU 补丁里的 camera_sanity，第一阶段被拦时 `run_all.sh` 自己退出 3，worker 记 `native_gate_stop`。
-3. **split 模式**：把 `data_generate_demo/run_roma_pcd.sh` 和 `run_pda_depth.sh` 里 `glomap` 之后的命令抄成 `GLR_DENSE_CMD`（占位符 `{images} {out} {s1} {threads} {py}`），第一阶段用 `GLR_STAGE1_CMD`（默认 `python -m reconstruction_flow.glomap --images {images} --output {s1} --camera-model PINHOLE`）。这样关口 stop 时省下 RoMa/PDA 的小时数。
-4. 跑完看 `result*/result.json` 的 `found`：`sparse_models`、`databases`、`pda_fused`（`**/fused/*.npz`，键 `fine`/`coarse`）、`pi3x_prior`。如果 `pda_fused` 为空而你知道深度在别处，改 `glr_collect.read_depth_maps` 的 glob，并在这里记下真实布局。
+3. **split 模式**：把 `data_generate_demo/run_roma_pcd.sh` 和 `run_pda_depth.sh` 里 `glomap` 之后的命令抄成 `GLR_DENSE_CMD`（bash 命令行，可以是 `a && b`；占位符 `{images} {out} {s1} {threads} {py}` 会变成对环境变量 `GLR_IMAGES GLR_OUT GLR_S1 GLR_THREADS GLR_PY` 的带引号引用，裸写或写在 `"..."` 里都行，写在 `'...'` 里不展开），第一阶段用 `GLR_STAGE1_CMD`（默认 `{py} -m reconstruction_flow.glomap --images {images} --output {s1} --camera-model PINHOLE`）。这样关口 stop 时省下 RoMa/PDA 的小时数。`run_batch_glr.sh --worker-mode=split` 没有 `GLR_DENSE_CMD` 会拒绝启动（只有第一阶段的结果没有深度，QC 会拒掉；只想跑第一阶段加关口时设 `GLR_STAGE1_ONLY=1`）。
+4. 跑完看 `result*/result.json` 的 `status`、`gate`、`gate_model`（关口看的那个稀疏模型，标签就由它生成）和 `found`：`sparse_models`、`databases`、`pda_fused`（`**/fused/*.npz`，键 `fine`/`coarse`）、`pi3x_prior`。如果 `pda_fused` 为空而你知道深度在别处，改 `glr_collect.read_depth_maps` 的 glob，并在这里记下真实布局（布局猜错时每段都会以 `depth_missing` 被拒并回退 v1.3，不会悄悄产出无深度标签）。状态：`complete`、`complete_gate_stop` / `complete_gate_error`（mono，稠密已跑完但关口 stop / 出错）、`stopped_at_gate`、`native_gate_stop`、`gate_error`（split，没跑稠密）、`stage1_only`、`failed`、`interrupted`。
 5. H200 上 `--phase=c`；先看 `qc_glr/*.json` 的 `glr.depth_source` 和 `info_flags`。
 6. 在 A 组的一两段（有真值）上用 `--skip-filter --glr-all` 跑，对 `outputs/bench/eval3d_A` 评测 GLR 标签，数字写进 `docs/experiments/LOG.md`，再谈采纳。
 

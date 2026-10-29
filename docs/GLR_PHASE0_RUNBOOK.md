@@ -13,12 +13,12 @@
    - OOD 无真值的片段不进标签，只看信号表。
 2. 回放：
    ```bash
-   cd code && export ANNO_ROOT=...        # 只用来定位 pipeline/ 里的模块，不读数据
-   $PY_GLR tools/glr_gate_replay.py $NPU_PORT/runs/kitti_multi \
+   export ANNO_ROOT=...                    # 结果写到 $ANNO_ROOT/outputs/（不要写进仓库目录：csv 不在 .gitignore 里）
+   $PY_GLR $ANNO_ROOT/code/tools/glr_gate_replay.py $NPU_PORT/runs/kitti_multi \
        $NPU_PORT/runs/robust-stage1/gate_power \
-       --labels labels.csv --out outputs/evolution/E15/gate_signals.csv
+       --labels labels.csv --out $ANNO_ROOT/outputs/evolution/E15/gate_signals.csv
    ```
-   `PY_GLR` = GLRMap 环境的 python（numpy + pycolmap）。工具只读数据库和模型，不改任何东西。
+   `PY_GLR` = GLRMap 环境的 python（numpy + pycolmap）。工具只读数据库和模型，不改任何东西；`--out` 必须是不存在的文件（不覆盖），它的目录会先建好，每处理完一次运行就写一行，中途崩溃也保留已有结果；读不出来的运行（数据库损坏等）在表里是 `verdict=error`，报告会警告，它们**不算**被标出。
 3. K 证人信号（可选）：对每个窗口算 Pi3X(仅图像) / DA3 / GeoCalib 的 HFOV 中位数，写 `witness.csv`（`run,hfov_deg`），加 `--witness witness.csv`，看 `k_witness_disagree` 的捕获率。
 4. **通过线**：9 次静默走偏至少抓到 7 次；全部非精确（静默走偏 + 退化）的 ≥ 90% 被标 stop 或 suspect；26 个精确的运行里被误 **stop** 的 ≤ 2 个（现有 camera_sanity 误拦 2 个）。**放弃线**：达不到则结论是“GLRMap 不上网络视频，除非内参策略改变”，不要去调阈值凑通过。
 5. 留一窗口：若要调阈值，按窗口分组（工具输出末行提示的分组数）做留一交叉验证，在报告里写明哪些数字是样本内的。

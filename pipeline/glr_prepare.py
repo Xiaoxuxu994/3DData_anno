@@ -2,6 +2,8 @@
 
 Usage:  python glr_prepare.py OUT route [--cfg FILE] [--vlm TAG] [--glr-all]
         python glr_prepare.py OUT jobs  [--cfg FILE] [--copy] [--clips a,b]
+A job package is built in a hidden temporary directory and renamed to glr_jobs/<clip> only when complete (a crash leaves no half-written
+job); a clip that fails (no frames, unreadable files ...) is reported and skipped, the others are still prepared, and the exit code is 1.
 Inputs  (written by pipeline/run_batch.sh; OUT = a run directory):
   OUT/bench/clips.json        clips that passed the filter (the annotate list) - OUT/bench/clips_all.json has every clip
   OUT/bench/frames/<clip>/    15 fps frames 000000.jpg ...
@@ -19,11 +21,15 @@ Clips that pass the filter but are rotation-dominated, dynamic, slow-moving or d
 feed-forward v1.3 annotator (route v13); the filter's own rejects stay rejects.
 """
 
+import argparse
 import csv
 import json
 import math
 import os
+import re
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -115,11 +121,63 @@ def k_prior(bench, clip):
     return {"hfov_deg": float(np.median(vals)), "sources": h} if vals else None
 
 
-def main():
-    a = sys.argv[1:]
-    out, mode = Path(a[0]), a[1]
-    opt = dict(x[2:].split("=", 1) if "=" in x else (x[2:], "1") for x in a[2:] if x.startswith("--"))
-    cfg = C.load_cfg(opt.get("cfg"))
+def build_job(out, bench, c, route_row, cfg, copy=False):
+    """Write glr_jobs/<clip>/{images/, job.json} atomically -> (stride, n_images). Raises on any problem; leaves no partial job behind."""
+    name = c["clip"]
+    frames = sorted((bench / "frames" / name).glob("*.jpg"))
+    if not frames:
+        raise FileNotFoundError(f"no frames in {bench / 'frames' / name}")
+    mag = route_row.get("mag_median_frac")
+    mag = float(mag) if mag not in (None, "", "None") else None
+    stride = choose_stride(len(frames), mag, cfg)
+    idx = list(range(0, len(frames), stride))
+    try:
+        kp = k_prior(bench, name)
+    except Exception as e:  # noqa: BLE001  - the K prior is only the gate's witness; a broken witness file must not block the job
+        print(f"warning: no K prior for {name} ({e!r})")
+        kp = None
+    job = {"clip": name, "annotator": "glr", "version": cfg["version"], "n_orig": len(frames),
+           "fps_orig": c.get("fps_out", 15), "stride": stride, "frame_idx": idx,
+           "image_names": [f"{k + 1:06d}.jpg" for k in range(len(idx))], "hw": c.get("hw"),
+           "route_reasons": route_row.get("reasons", ""), "k_prior": kp, "stage1_gate_cfg": cfg["stage1_gate"]}
+    root = out / "glr_jobs"
+    root.mkdir(exist_ok=True)
+    tmp = Path(tempfile.mkdtemp(prefix=f".{name}.", dir=root))
+    try:
+        (tmp / "images").mkdir()
+        for k, i in enumerate(idx):
+            dst = tmp / "images" / f"{k + 1:06d}.jpg"
+            if copy:
+                dst.write_bytes(frames[i].read_bytes())
+            else:
+                dst.symlink_to(frames[i].resolve())
+        C.dump_json(tmp / "job.json", job)
+        final = root / name
+        if final.exists():  # a half-written job of an older version (images/ without job.json): move it aside, never delete
+            stale, n = root / f".{name}.stale", 0
+            while stale.exists():
+                n += 1
+                stale = root / f".{name}.stale{n}"
+            final.rename(stale)
+        tmp.rename(final)
+    except BaseException:
+        shutil.rmtree(tmp, ignore_errors=True)   # our own temporary directory: symlinks / copies made a moment ago
+        raise
+    return stride, len(idx)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="GLR track phase A: route the clips and write the GLRMap job packages")
+    ap.add_argument("out", help="run directory (OUT of run_batch.sh)")
+    ap.add_argument("mode", choices=("route", "jobs"))
+    ap.add_argument("--cfg", help="config yaml (default configs/pipeline_glr_v0.yaml); must exist")
+    ap.add_argument("--vlm", help="route: VLM tag whose verdict is used (default: the first vlm_* block)")
+    ap.add_argument("--glr-all", action="store_true", help="route: send every clip that passed the filter to GLRMap")
+    ap.add_argument("--copy", action="store_true", help="jobs: copy the frames instead of symlinking them")
+    ap.add_argument("--clips", help="jobs: comma separated clips")
+    a = ap.parse_args(argv)
+    out, mode = Path(a.out), a.mode
+    cfg = C.load_cfg(a.cfg)
     B, P = out / "bench", out / "pool"
     allc = json.loads((B / "clips_all.json").read_text()) if (B / "clips_all.json").exists() else json.loads((B / "clips.json").read_text())
     passed_names = {c["clip"] for c in json.loads((B / "clips.json").read_text())}
@@ -135,7 +193,7 @@ def main():
             sp = P / name / "scores.json"
             scores = json.loads(sp.read_text()) if sp.exists() else {}
             ok = (dec[name]["decision"] == "pass") if name in dec else (name in passed_names)
-            route, why, f = route_clip(scores, cfg, ok, opt.get("vlm"), "glr" if "glr-all" in opt else None)
+            route, why, f = route_clip(scores, cfg, ok, a.vlm, "glr" if a.glr_all else None)
             rows.append({"clip": name, "route": route, "reasons": ";".join(why), **f,
                          "filter_reasons": dec.get(name, {}).get("reason", "")})
         (out / "filter").mkdir(exist_ok=True)
@@ -145,43 +203,34 @@ def main():
             w.writerows(rows)
         cnt = {k: sum(r["route"] == k for r in rows) for k in ("reject", "glr", "v13")}
         print(json.dumps(cnt))
-    elif mode == "jobs":
-        with open(out / "filter" / "glr_route.csv") as fh:
-            routes = {r["clip"]: r for r in csv.DictReader(fh)}
-        want = set(opt["clips"].split(",")) if "clips" in opt else None
-        n_jobs = 0
-        for c in allc:
-            name = c["clip"]
-            if routes.get(name, {}).get("route") != "glr" or (want and name not in want):
-                continue
-            jd = out / "glr_jobs" / name
-            if (jd / "job.json").exists():
-                print("exists, skipped:", name)
-                continue
-            frames = sorted((B / "frames" / name).glob("*.jpg"))
-            mag = routes[name].get("mag_median_frac")
-            mag = float(mag) if mag not in (None, "", "None") else None
-            stride = choose_stride(len(frames), mag, cfg)
-            idx = list(range(0, len(frames), stride))
-            (jd / "images").mkdir(parents=True)
-            for k, i in enumerate(idx):
-                dst = jd / "images" / f"{k + 1:06d}.jpg"
-                if "copy" in opt:
-                    dst.write_bytes(frames[i].read_bytes())
-                else:
-                    dst.symlink_to(frames[i].resolve())
-            job = {"clip": name, "annotator": "glr", "version": cfg["version"], "n_orig": len(frames),
-                   "fps_orig": c.get("fps_out", 15), "stride": stride, "frame_idx": idx,
-                   "image_names": [f"{k + 1:06d}.jpg" for k in range(len(idx))], "hw": c.get("hw"),
-                   "route_reasons": routes[name].get("reasons", ""), "k_prior": k_prior(B, name),
-                   "stage1_gate_cfg": cfg["stage1_gate"]}
-            C.dump_json(jd / "job.json", job)
-            n_jobs += 1
-            print(name, "stride", stride, "frames", len(idx))
-        print("jobs written:", n_jobs)
-    else:
-        sys.exit("mode must be route or jobs")
+        return 0
+    with open(out / "filter" / "glr_route.csv") as fh:
+        routes = {r["clip"]: r for r in csv.DictReader(fh)}
+    want = set(a.clips.split(",")) if a.clips else None
+    n_jobs, failed = 0, []
+    for c in allc:
+        name = c["clip"]
+        if routes.get(name, {}).get("route") != "glr" or (want and name not in want):
+            continue
+        if (out / "glr_jobs" / name / "job.json").exists():
+            print("exists, skipped:", name)
+            continue
+        if not re.fullmatch(r"[A-Za-z0-9._-]+", name):
+            print(f"warning: clip name {name!r} has characters outside [A-Za-z0-9._-]; the worker handles them, GLRMap's own scripts may not")
+        try:
+            stride, n = build_job(out, B, c, routes[name], cfg, a.copy)
+        except Exception as e:  # noqa: BLE001
+            print(f"job FAILED: {name}: {e!r}")
+            failed.append(name)
+            continue
+        n_jobs += 1
+        print(name, "stride", stride, "frames", n)
+    print("jobs written:", n_jobs)
+    if failed:
+        print("jobs failed:", ",".join(failed))
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

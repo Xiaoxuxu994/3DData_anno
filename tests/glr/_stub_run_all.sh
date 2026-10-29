@@ -2,12 +2,14 @@
 # stand-in for GLRMap's data_generate_demo/run_all.sh (reads IMAGES, OUTPUT from the environment)
 HERE=$(cd "$(dirname "$0")" && pwd)
 ${PY_GLR:-python3} - <<PY
-import os, sys
+import json, os, sys
 sys.path.insert(0, "$HERE")
 import numpy as np, _fix
 from pathlib import Path
 out, images = Path(os.environ["OUTPUT"]), Path(os.environ["IMAGES"])
-names = sorted(p.name for p in images.glob("*.jpg")); n = max(len(names), 8)
+job = images.parent / "job.json"
+names = json.loads(job.read_text())["image_names"] if job.exists() else sorted(p.name for p in images.glob("*.jpg"))
+n = max(len(names), 8)
 names = (names + [f"{i+1:06d}.jpg" for i in range(len(names), n)])[:n]
 K = np.array([[500.0, 0, 320], [0, 500, 180], [0, 0, 1]])
 s1 = out / "base" / "scene"

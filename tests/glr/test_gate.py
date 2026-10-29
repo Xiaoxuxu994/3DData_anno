@@ -68,6 +68,32 @@ class GateRules(unittest.TestCase):
         r = G.gate(*KITTI_0005, 100, cfg={"max_planar_frac": 0.1})
         self.assertIn("planar_or_panoramic_pairs", r["stop"])
 
+    @staticmethod
+    def cam(W, H, f, **kw):
+        return dict({"n_reg": 100, "n_points": 30000, "reproj": 0.5, "fx": f, "fy": f, "fx_fy": 1.0, "W": W, "H": H,
+                     "focal_w": f / W, "focal_rel": f / max(W, H), "hfov_deg": float(np.degrees(2 * np.arctan(W / 2 / f))),
+                     "tri_angle_p50": 5.0, "step_ratio": 1.2}, **kw)
+
+    def test_focal_rules_are_relative_to_the_long_side(self):
+        # COLMAP's default focal is 1.2 x max(W, H): untouched focals are flagged in portrait clips too, legitimate ones are not
+        land = G.gate(self.cam(640, 360, 768.0), {"planar_frac": 0.0}, 100)
+        port = G.gate(self.cam(360, 640, 768.0), {"planar_frac": 0.0}, 100)
+        self.assertIn("focal_at_colmap_default", land["suspect"])
+        self.assertIn("focal_at_colmap_default", port["suspect"])
+        legit = G.gate(self.cam(360, 640, 432.0), {"planar_frac": 0.0}, 100)   # fx / W = 1.2, fx / max(W, H) = 0.675
+        self.assertEqual(legit["verdict"], "ok", legit)
+        # sane range 0.3 .. 4 x max(W, H) (the HFOV range [14.3, 118.1] of a landscape frame), same focal bounds for every shape
+        wide = G.gate(self.cam(1080, 1920, 480.0), {"planar_frac": 0.0}, 100)      # 0.25 x max(W, H): HFOV 96.7 deg in portrait
+        self.assertIn("hfov_out_of_range", wide["stop"])
+        self.assertNotIn("hfov_out_of_range", G.gate(self.cam(1080, 1920, 620.0), {"planar_frac": 0.0}, 100)["stop"])   # 0.32
+        self.assertIn("hfov_out_of_range", G.gate(self.cam(1920, 1080, 560.0), {"planar_frac": 0.0}, 100)["stop"])      # 0.29: HFOV 119 deg
+        self.assertNotIn("hfov_out_of_range", G.gate(self.cam(1920, 1080, 700.0), {"planar_frac": 0.0}, 100)["stop"])   # HFOV 108 deg
+        self.assertIn("hfov_out_of_range", G.gate(self.cam(1920, 1080, 8000.0), {"planar_frac": 0.0}, 100)["stop"])      # 4.17 x
+
+    def test_legacy_model_dicts_without_wh_still_work(self):
+        self.assertIn("hfov_out_of_range", G.gate({"n_reg": 90, "n_points": 9000, "hfov_deg": 125.0}, None, 100)["stop"])
+        self.assertNotIn("hfov_out_of_range", G.gate({"n_reg": 90, "n_points": 9000, "hfov_deg": 60.0}, None, 100)["stop"])
+
 
 @unittest.skipUnless(__import__("importlib").util.find_spec("pycolmap"), "pycolmap not installed")
 class RealModelIO(unittest.TestCase):
@@ -108,19 +134,66 @@ class RealModelIO(unittest.TestCase):
         self.assertTrue(np.allclose(cams["K"][0], self.K))
         self.assertEqual((cams["W"], cams["H"]), (self.W, self.H))
 
-    def test_cli_exit_codes(self):
+    def cli(self, *args):
         import subprocess
         import sys
+        return subprocess.run([sys.executable, str(_fix.PIPE / "glr_stage1_gate.py"), *map(str, args)], capture_output=True, text=True)
+
+    def test_cli_exit_codes(self):
         job = {"stage1_gate_cfg": {}, "k_prior": {"hfov_deg": 70.0}}
         (self.root / "job.json").write_text(json.dumps(job))
-        base = [sys.executable, str(_fix.PIPE / "glr_stage1_gate.py"), str(self.root / "m"), str(self.root / "database.db"), "20"]
-        r = subprocess.run(base, capture_output=True, text=True)
+        base = [self.root / "m", self.root / "database.db", "20"]
+        r = self.cli(*base)
         self.assertIn(r.returncode, (0, 1), r.stderr)  # n_points/frame high enough; may be 'suspect' (default-focal coincidence etc.)
         out = json.loads(r.stdout)
         self.assertIn("gate", out)
-        r = subprocess.run(base + ["--job", str(self.root / "job.json"), "--witness-hfov", "20"], capture_output=True, text=True)
+        r = self.cli(*base, "--job", self.root / "job.json", "--witness-hfov", "20")
         self.assertEqual(r.returncode, 1)  # K witness disagrees by > 13.2 deg -> suspect
         self.assertIn("k_witness_disagree", json.loads(r.stdout)["gate"]["suspect"])
+        w = self.root / "gate_compact.json"
+        r = self.cli(*base, "--job", self.root / "job.json", "--witness-hfov", "20", "--require-db", "--write", w)
+        compact = json.loads(w.read_text())
+        self.assertEqual((compact["verdict"], r.returncode), ("suspect", 1))
+        self.assertIn("n_reg", compact["model"])
+        self.assertIn("planar_frac", compact["db"])
+
+    def test_gate_failures_are_an_error_verdict_with_exit_4(self):
+        w = self.root / "err.json"
+        bad = self.root / "bad.db"
+        bad.write_bytes(b"this is not a database")
+        r = self.cli(self.root / "m", bad, "20", "--write", w)
+        self.assertEqual(r.returncode, 4)
+        self.assertEqual(json.loads(r.stdout)["gate"]["verdict"], "error")
+        self.assertEqual(json.loads(w.read_text())["verdict"], "error")
+        self.assertTrue(json.loads(w.read_text())["error"])
+        r = self.cli(self.root / "m", self.root / "missing.db", "20", "--require-db")      # strict: a missing database is a failure
+        self.assertEqual((r.returncode, json.loads(r.stdout)["gate"]["verdict"]), (4, "error"))
+        r = self.cli(self.root / "m", self.root / "missing.db", "20")                      # the replay tool's lenient mode
+        self.assertIn(r.returncode, (0, 1))
+        r = self.cli(self.root / "no_such_model", self.root / "database.db", "20")         # unreadable model
+        self.assertEqual(r.returncode, 4)
+        self.assertFalse((self.root / "missing.db").exists())                              # and nothing was created next to the data
+
+    def test_database_path_with_uri_characters(self):
+        import shutil
+        for name in ("x #shorts", "what?now", "100%", "a b"):
+            d = self.root / name
+            d.mkdir()
+            shutil.copy(self.root / "database.db", d / "database.db")
+            before = sorted(p.name for p in self.root.iterdir())
+            s = G.summarize_db(d / "database.db")
+            self.assertEqual(s["n_images"], 20, name)
+            self.assertEqual(sorted(p.name for p in self.root.iterdir()), before, f"stray file created for {name!r}")
+            self.assertEqual([p.name for p in d.iterdir()], ["database.db"])
+
+    def test_portrait_default_focal_is_flagged_end_to_end(self):
+        c2w = _fix.look_at_rig(12, 0.25)
+        for (W, H), tag in (((640, 360), "land"), ((360, 640), "port")):
+            K = np.array([[768.0, 0, W / 2], [0, 768.0, H / 2], [0, 0, 1]])           # untouched COLMAP default 1.2 x max(W, H)
+            _fix.write_text_model(self.root / f"def_{tag}", c2w, K, W, H, _fix.scene_points(3000, depth=(8.0, 20.0)))
+            m = G.summarize_model(self.root / f"def_{tag}")
+            self.assertAlmostEqual(m["focal_rel"], 1.2, places=3)
+            self.assertIn("focal_at_colmap_default", G.gate(m, None, 12)["suspect"], tag)
 
 
 if __name__ == "__main__":

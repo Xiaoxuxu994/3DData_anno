@@ -21,19 +21,23 @@ route:               # clips that pass the filter: static scene + real parallax 
 stage1_gate:         # glr_stage1_gate.py; stop = do not spend RoMa/PDA on this camera, suspect = demote to T2
   min_reg_frac: 0.5
   min_pts_per_img: 50
-  hfov_range_deg: [14.3, 118.1]    # focal 0.3 .. 4 x max(W, H), as in GLRMap's camera_sanity patch
+  hfov_range_deg: [14.3, 118.1]    # focal 0.3 .. 4 x max(W, H), as in GLRMap's camera_sanity patch (= HFOV of a landscape frame; portrait gets the same focal range)
   max_fx_fy_dev: 0.1
   max_planar_frac: 0.5             # PLANAR_OR_PANORAMIC share of the verified pairs (drone 100 %, indoor 100 %, KITTI <= 17 %)
   max_reproj_px: 1.0
   max_step_ratio: 5.0              # adjacent-camera step, max / median (Ahlbeck 15, KITTI 1.2-1.3)
-  default_focal_w: 1.2             # COLMAP's default initial focal / width: a final focal this close was probably never estimated
+  default_focal_w: 1.2             # COLMAP's default initial focal / max(W, H): a final focal this close was probably never estimated
   default_focal_tol: 0.06          # 0.03 in the evaluation sessions (Tokyo 1.18, Ahlbeck 1.19); the pycolmap replica ended at 1.16 on Ahlbeck
   min_median_tri_angle_deg: 2.0
   max_witness_hfov_dis_deg: 13.2   # same number as the v1c K-disagreement threshold
 qc:
   thr: {xtraj_ba: 3.27, xdepth_k: 0.194, kdis: 13.2}   # v1c (E8), reused unchanged: the witnesses are noisier than GLRMap's good case
-  tier1_part: 0.5          # T1 needs every v1c part <= 0.5 x its threshold
+  tier1_part: 0.5          # T1 needs every v1c part finite and <= 0.5 x its threshold
   reject_flags: [jump60, fov_out]
+  require_gate: true       # no readable stage-1 gate.json / a gate that errored -> reject (s1_gate_missing, s1_gate_error)
+  require_all_parts: true  # a v1c part that cannot be computed (no K witness, no DA3 depth, no ViPE path) -> reject (<part>_not_checkable)
+  allow_no_depth: false    # a label without GLRMap depth breaks the label contract -> reject (depth_missing)
+  min_depth_cov: 0.9       # fraction of label frames with depth: below -> info flag depth_partial and no T1
   label_long: 512
   qc_long: 512
   n_depth_frames: 8

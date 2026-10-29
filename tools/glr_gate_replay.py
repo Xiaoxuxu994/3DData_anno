@@ -1,7 +1,9 @@
 """Phase 0.2 of the GLRMap evaluation plan: replay the stage-1 gate signals offline on stage-1 outputs that already exist on disk.
 
-Usage: python tools/glr_gate_replay.py ROOT [ROOT ...] [--labels labels.csv] [--out signals.csv] [--cfg configs/pipeline_glr_v0.yaml]
+Usage: python tools/glr_gate_replay.py ROOT [ROOT ...] --out signals.csv [--labels labels.csv] [--cfg configs/pipeline_glr_v0.yaml]
                                        [--min-frames 0] [--witness witness.csv]
+  --out  required, must not exist (nothing is overwritten); its directory is created first and every row is written as soon as it is
+         computed, so a crash after hours of replay keeps what was done. Use an absolute path under ROOT/outputs/ (not inside the repo).
   ROOT   directories searched (recursively) for stage-1 outputs: a directory that holds database.db and sparse/<k>/ (COLMAP layout,
          e.g. GLRMap's OUT/{images,database.db,sparse/0}). Nothing is modified; every database is opened read-only.
   --labels   CSV with columns `run,label` (run = path relative to its ROOT, or the directory name) and label in
@@ -26,6 +28,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "pipeline"))
 import glr_stage1_gate as G  # noqa: E402
 
+FIELDS = ["run", "n_frames", "n_reg", "n_points", "reproj", "focal_w", "focal_rel", "fx_fy", "hfov_deg", "step_ratio", "tri_angle_p50", "pts_per_img",
+          "planar_frac", "kp_mean", "witness_dis", "verdict", "stop", "suspect", "label"]
 RULES = ["registered_lt_half", "points_per_image", "hfov_out_of_range", "fx_fy_mismatch", "planar_or_panoramic_pairs",
          "reproj_gt_1px", "pose_step_outlier", "focal_at_colmap_default", "low_parallax", "k_witness_disagree"]
 
@@ -50,40 +54,47 @@ def main():
     ap.add_argument("roots", nargs="+")
     ap.add_argument("--labels")
     ap.add_argument("--witness")
-    ap.add_argument("--out", default="gate_signals.csv")
+    ap.add_argument("--out", required=True)
     ap.add_argument("--cfg")
     ap.add_argument("--min-frames", type=int, default=0)
     a = ap.parse_args()
+    out = Path(a.out)
+    if out.exists():
+        sys.exit(f"{out} exists - choose a new --out (results are never overwritten)")
+    out.parent.mkdir(parents=True, exist_ok=True)
     cfg = G._load_cfg(a.cfg)
     labels, wit = load_csv(a.labels, "run", "label"), load_csv(a.witness, "run", "hfov_deg")
     rows = []
-    for root in a.roots:
-        for d, db, model in find_runs(root):
-            run = str(d.relative_to(root)) if d != Path(root) else d.name
-            try:
-                m, s = G.summarize_model(model), G.summarize_db(db)
-                n = s["n_images"]
-                if n < a.min_frames:
-                    continue
-                w = float(wit[run]) if run in wit else (float(wit[d.name]) if d.name in wit else None)
-                v = G.gate(m, s, n, cfg, w)
-                row = {"run": run, "n_frames": n, **{k: m.get(k) for k in ("n_reg", "n_points", "reproj", "focal_w", "fx_fy", "hfov_deg",
-                                                                          "step_ratio", "tri_angle_p50")},
-                       "pts_per_img": v["signals"].get("pts_per_img"), "planar_frac": s.get("planar_frac"), "kp_mean": s.get("kp_mean"),
-                       "witness_dis": v["signals"].get("witness_hfov_dis"), "verdict": v["verdict"],
-                       "stop": ";".join(v["stop"]), "suspect": ";".join(v["suspect"]), "label": labels.get(run, labels.get(d.name, ""))}
-            except Exception as e:  # noqa: BLE001
-                row = {"run": run, "verdict": "error", "stop": repr(e)[:120], "label": labels.get(run, "")}
-            rows.append(row)
-            print(json.dumps({k: row.get(k) for k in ("run", "n_reg", "pts_per_img", "focal_w", "planar_frac", "verdict", "label")}, default=float))
+    with open(out, "x", newline="") as fh:   # exclusive create: fails now, not after the whole replay, if the file cannot be written
+        wr = csv.DictWriter(fh, fieldnames=FIELDS, extrasaction="ignore", restval="")
+        wr.writeheader()
+        for root in a.roots:
+            for d, db, model in find_runs(root):
+                run = str(d.relative_to(root)) if d != Path(root) else d.name
+                try:
+                    m, s = G.summarize_model(model), G.summarize_db(db)
+                    n = s["n_images"]
+                    if n < a.min_frames:
+                        continue
+                    w = float(wit[run]) if run in wit else (float(wit[d.name]) if d.name in wit else None)
+                    v = G.gate(m, s, n, cfg, w)
+                    row = {"run": run, "n_frames": n, **{k: m.get(k) for k in ("n_reg", "n_points", "reproj", "focal_w", "focal_rel", "fx_fy",
+                                                                              "hfov_deg", "step_ratio", "tri_angle_p50")},
+                           "pts_per_img": v["signals"].get("pts_per_img"), "planar_frac": s.get("planar_frac"), "kp_mean": s.get("kp_mean"),
+                           "witness_dis": v["signals"].get("witness_hfov_dis"), "verdict": v["verdict"],
+                           "stop": ";".join(v["stop"]), "suspect": ";".join(v["suspect"]), "label": labels.get(run, labels.get(d.name, ""))}
+                except Exception as e:  # noqa: BLE001
+                    row = {"run": run, "verdict": "error", "stop": repr(e)[:120], "label": labels.get(run, labels.get(d.name, ""))}
+                rows.append(row)
+                wr.writerow(row)
+                fh.flush()
+                print(json.dumps({k: row.get(k) for k in ("run", "n_reg", "pts_per_img", "focal_w", "planar_frac", "verdict", "label")}, default=float))
     if not rows:
-        sys.exit("no stage-1 outputs found")
-    fields = list(dict.fromkeys(k for r in rows for k in r))
-    with open(a.out, "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=fields)
-        w.writeheader()
-        w.writerows(rows)
-    print("wrote", a.out, len(rows), "runs")
+        sys.exit(f"no stage-1 outputs found (kept the empty {out})")
+    print("wrote", out, len(rows), "runs")
+    n_err = sum(r.get("verdict") == "error" for r in rows)
+    if n_err:
+        print(f"WARNING: {n_err} runs could not be read (verdict error, reason in column `stop`): they count as NOT flagged below")
     if not labels:
         return
     acc = [r for r in rows if r["label"] == "accurate"]

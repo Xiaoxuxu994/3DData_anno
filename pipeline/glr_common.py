@@ -2,13 +2,15 @@
 
 Pure numpy (cv2 only inside `to_grid`). `umeyama`, `traj_pct`, `depth_cmp`, `to_grid` and the metric-scale rule are copies of
 vipe_eval/eval_vipe.py, qc/qc_cross.py, bench/eval3d_bench.py and evolution/e3_scale_vote.py (E3b: k = sqrt(k_traj * k_depth)),
-so the GLR code runs without those scripts' hard-coded paths; tests/glr/test_common.py compares them with the originals
-whenever the originals can be imported.
+so the GLR code runs without those scripts' hard-coded paths; tests/glr/test_fidelity.py extracts the original functions from their
+source files (AST, no imports of the hard-coded paths) and compares the copies with them on random inputs. `metric_scale` is
+identical to E3b where E3b has evidence and differs only where GLRMap's label is not a Pi3X label (see its docstring).
 
 Config: DEFAULTS below are the single source of truth; configs/pipeline_glr_v0.yaml overrides them (loaded with PyYAML when it is
 installed, else with a small parser for the subset that file uses).
 """
 
+import copy
 import json
 import math
 import os
@@ -31,16 +33,22 @@ DEFAULTS = {
     # stage-1 exit gate: defaults live in glr_stage1_gate.DEFAULT_CFG (the worker host only has that file)
     "stage1_gate": {},
     "qc": {"thr": {"xtraj_ba": 3.27, "xdepth_k": 0.194, "kdis": 13.2},  # v1c thresholds (E8), reused unchanged
-           "tier1_part": 0.5,        # T1 needs every v1c part <= tier1_part * threshold
+           "tier1_part": 0.5,        # T1 needs every v1c part finite and <= tier1_part * threshold
            "reject_flags": ["jump60", "fov_out"],
+           # GLRMap's failures are silent and mostly about K, so the GLR track is stricter than v1.3 about what it cannot check:
+           "require_gate": True,      # no readable stage-1 gate.json (or a gate that errored) -> reject (s1_gate_missing / s1_gate_error)
+           "require_all_parts": True,  # a v1c part that cannot be computed (no K witness, no DA3 depth ...) -> reject (<part>_not_checkable)
+           "allow_no_depth": False,   # a label without GLRMap depth violates the label contract -> reject (depth_missing)
+           "min_depth_cov": 0.9,      # fraction of label frames with depth: below -> info flag depth_partial, and no T1
            "label_long": 512, "qc_long": 512, "n_depth_frames": 8, "n_scale_frames": 10},
 }
 
 
 def _deep_merge(a, b):
-    out = dict(a)
+    """a with b merged in; the result shares no mutable object with either input."""
+    out = copy.deepcopy(a)
     for k, v in (b or {}).items():
-        out[k] = _deep_merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+        out[k] = _deep_merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else copy.deepcopy(v)
     return out
 
 
@@ -123,7 +131,8 @@ def mini_yaml(text):
 
 
 def load_cfg(path=None):
-    """DEFAULTS merged with the YAML at `path` (default: CODE/configs/pipeline_glr_v0.yaml if it exists)."""
+    """DEFAULTS merged with the YAML at `path`. An explicit `path` must exist (a typo must not silently fall back to the defaults);
+    without one, CODE/configs/pipeline_glr_v0.yaml is used if it exists."""
     cfg = _deep_merge(DEFAULTS, {})
     try:
         import glr_stage1_gate as G
@@ -131,6 +140,8 @@ def load_cfg(path=None):
     except Exception:  # noqa: BLE001
         pass
     p = Path(path) if path else CODE / "configs" / "pipeline_glr_v0.yaml"
+    if path and not p.is_file():
+        raise FileNotFoundError(f"config file not found: {path}")
     if p.exists():
         text = p.read_text()
         try:
@@ -205,37 +216,44 @@ def to_grid(depth, K, H, W):
     return D, K
 
 
-def metric_scale(c2w_x, D_x, c2w_ref, D_ref, n_depth_frames=10):
+def metric_scale(c2w_x, D_x, c2w_ref, D_ref, n_depth_frames=10, neutral=1.0):
     """Scale k that brings annotator X (cameras + depth, arbitrary scale) to the metric reference (ViPE), E3b rule:
          s = Sim(3) scale of X's camera centres onto the reference's (NaN when the reference path is < 2 % of the scene depth
              or the aligned residual is > 20 % of its path),  r = median(D_ref) / median(D_x) over co-valid pixels of
-         `n_depth_frames` frames,  k_traj = s (else r, else 1),  k_depth = r (else 1),  k = sqrt(k_traj * k_depth).
-    All inputs refer to the same frames / grid. D may be None (no depth): then only the trajectory vote is used."""
+         `n_depth_frames` frames,  k_traj = s (else r, else `neutral`),  k_depth = r (else k_traj),  k = sqrt(k_traj * k_depth).
+    All inputs refer to the same frames / grid. Where E3b has evidence this is E3b exactly (tests/glr/test_fidelity.py). Differences,
+    all for a label whose depth can be missing (GLRMap) rather than a Pi3X label that always has depth:
+      * the `n_depth_frames` frames are spread over the frames where D_x has any finite pixel (all frames when D_x is complete);
+      * a missing depth ratio makes k_depth = k_traj (E3b: 1.0, which would halve the log of the trajectory scale; in E3b a missing
+        ratio always comes with a missing trajectory vote, so the two rules only differ in the case of the next bullet);
+      * the scene depth for the 2 %-path rule comes from the reference depth alone when D_x is None or has no co-valid pixels
+        (E3b: no trajectory vote then);
+      * `neutral` is what E3b calls 1.0 (no evidence at all). The GLR track passes NaN, because GLRMap's SfM scale is arbitrary:
+        1.0 would export SfM units as metres.  D_x may be None (no depth): then only the trajectory vote is used."""
     r = s = float("nan")
-    res = move = float("nan")
     dm = float("inf")
     if D_ref is not None:
         ks = np.linspace(0, len(D_ref) - 1, n_depth_frames).astype(int)
         a = D_ref[ks]
-        if D_x is not None:  # co-valid pixels of both depth maps (the E3b rule)
-            b = D_x[ks]
-            mk = np.isfinite(a) & np.isfinite(b) & (a > 0) & (b > 0)
-            if mk.sum() > 1000:
-                r = float(np.median(a[mk]) / np.median(b[mk]))
-                dm = float(np.median(a[mk]))
-        else:  # no depth from X: the reference depth still gives the scene depth that the 2 %-path rule needs
-            mk = np.isfinite(a) & (a > 0)
-            if mk.sum() > 1000:
-                dm = float(np.median(a[mk]))
+        mr = np.isfinite(a) & (a > 0)
+        if mr.sum() > 1000:  # scene depth from the reference alone (replaced by the co-valid median below when X has depth)
+            dm = float(np.median(a[mr]))
+        if D_x is not None:
+            have = np.flatnonzero(np.isfinite(D_x).reshape(len(D_x), -1).any(1))
+            if len(have):
+                kx = have[np.linspace(0, len(have) - 1, n_depth_frames).astype(int)]
+                a, b = D_ref[kx], D_x[kx]
+                mk = np.isfinite(a) & np.isfinite(b) & (a > 0) & (b > 0)  # co-valid pixels of both depth maps (the E3b rule)
+                if mk.sum() > 1000:
+                    r = float(np.median(a[mk]) / np.median(b[mk]))
+                    dm = float(np.median(a[mk]))
     pb, pm = c2w_x[:, :3, 3], c2w_ref[:, :3, 3]
     Lm = float(np.linalg.norm(np.diff(pm, axis=0), axis=1).sum())
     s_raw, R, t = umeyama(pb, pm, True)
     res = float(np.sqrt(((s_raw * pb @ R.T + t - pm) ** 2).sum(1).mean()) / max(Lm, 1e-9))
     move = Lm / dm if np.isfinite(dm) else float("nan")
     s = float(s_raw) if (Lm > 0.02 * dm and res < 0.2 and s_raw > 0) else float("nan")
-    k_t = s if np.isfinite(s) else (r if np.isfinite(r) else 1.0)
-    # E3b fills a missing depth ratio with 1.0; here a missing ratio means "GLRMap gave no depth", and averaging the trajectory scale
-    # with a neutral 1.0 would halve its log, so the trajectory vote stands alone in that case.
+    k_t = s if np.isfinite(s) else (r if np.isfinite(r) else neutral)
     k_d = r if np.isfinite(r) else k_t
     return {"k": float(math.sqrt(k_t * k_d)), "k_traj": float(k_t), "k_depth": float(k_d), "s_vipe": s, "r_vipe": r,
             "res_vipe": res, "move_vipe": move}

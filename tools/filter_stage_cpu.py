@@ -2,7 +2,8 @@
 
 Usage: python filter_stage_cpu.py STAGE_SCRIPT [ARGS ...]        (env: ANNO_ROOT, FILTER_POOL = pool dir, ANNO_LOGS = log dir)
 Same contract as pipeline/filter_stage.py (stage scripts of code/filter are executed as they are, logs redirected to ANNO_LOGS), plus:
-  * fcommon.H (hard-coded /data/home/z00533370 in the experiment scripts) is pointed at ANNO_ROOT,
+  * fcommon.H (hard-coded /data/home/z00533370 in the experiment scripts) is pointed at ANNO_ROOT, and fcommon.POOL at FILTER_POOL
+    (default ANNO_ROOT/data/filter_pool),
   * torch is patched so the stages' `.cuda()` / device="cuda" calls run on the CPU: Tensor.cuda / Module.cuda are no-ops, `.to("cuda")`
     maps to "cpu", torch.cuda.synchronize / empty_cache / memory counters become no-ops. (torch.zeros & co are left alone on purpose:
     GeoCalib's TorchScript functions resolve them by name and cannot compile a wrapper.)
@@ -50,10 +51,11 @@ sys.path.insert(0, str(FILTER))
 import fcommon  # noqa: E402
 
 fcommon.H = ROOT
-fcommon.LOGS = Path(os.environ["ANNO_LOGS"])
+fcommon.LOGS = Path(os.environ.get("ANNO_LOGS") or ROOT / "outputs" / "logs" / "filter")
 fcommon.LOGS.mkdir(parents=True, exist_ok=True)
-if "FILTER_POOL" in os.environ:
-    fcommon.POOL = Path(os.environ["FILTER_POOL"])
+# fcommon computed POOL at import from its hard-coded root; follow ANNO_ROOT unless FILTER_POOL says otherwise (a stage ADDS scores to
+# the pool it is pointed at, so it must never silently be the shared pool of another root)
+fcommon.POOL = Path(os.environ["FILTER_POOL"]) if os.environ.get("FILTER_POOL") else ROOT / "data" / "filter_pool"
 script = str(FILTER / sys.argv[1])
 sys.argv = [script] + sys.argv[2:]
 if __name__ == "__main__":

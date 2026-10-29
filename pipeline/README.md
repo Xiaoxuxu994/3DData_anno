@@ -127,7 +127,11 @@ ones (`labels_glr/`, `qc_glr/`, `results_glr.csv`, `final/`). Status, contracts,
 
 ```bash
 code/pipeline/run_batch_glr.sh outputs/my_glr_batch a.mp4 b.mp4 ... --phase=a      # filter + v1.3 + route + job packages (H200 host)
-GLRMAP_HOME=... PY_GLR=... GLR_TASKSET=0-7 code/pipeline/glr_worker.sh outputs/my_glr_batch/glr_jobs/<clip>   # GLRMap host
-code/pipeline/run_batch_glr.sh outputs/my_glr_batch --phase=c                      # collect, QC, final selection
+GLRMAP_HOME=... PY_GLR=... GLR_TASKSET=0-7 code/pipeline/glr_worker.sh outputs/my_glr_batch/glr_jobs/<clip>   # GLRMap host (rsync -aL the jobs there)
+code/pipeline/run_batch_glr.sh outputs/my_glr_batch --phase=c                      # collect, QC, final selection (copy glr_jobs/ back first)
 ```
+`glr_worker.sh` refuses to start without `GLR_TASKSET` (GLOMAP ignores thread caps; AGENTS.md rule 2) unless `GLR_ALLOW_UNCAPPED=1`; `--phase=b` of
+`run_batch_glr.sh` forwards `--gpus=` to the worker (or takes one idle GPU). Re-running a phase is the way to resume: finished GLRMap jobs are skipped, the
+derived tables (`results_glr.csv`, `qc_glr/`, `labels_glr/`, `final/`) are rebuilt from the job results, and `final/labels/` only holds links that follow
+the latest decision.
 

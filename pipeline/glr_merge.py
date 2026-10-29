@@ -3,7 +3,10 @@
 Usage: python glr_merge.py OUT
 Reads : OUT/filter/glr_route.csv (glr_prepare.py route), OUT/results.csv + OUT/labels/ (v1.3, run_batch.sh),
         OUT/results_glr.csv + OUT/labels_glr/ (glr_collect.py; optional)
-Writes: OUT/final/results.csv, OUT/final/labels/<clip>.npz (symlinks to the chosen label file), OUT/final/summary.json
+Writes: OUT/final/results.csv, OUT/final/labels/<clip>.npz (relative symlinks to the chosen label file), OUT/final/summary.json
+final/ is a VIEW derived from the inputs above and is rebuilt on every run ("resume = run again"): the links follow the current decision of
+every clip (re-pointed when the annotator changed, removed when the clip is no longer accepted). Only symbolic links are ever removed or
+replaced - never a label file, and a regular file sitting at a link's place is reported (final_label_is_a_file) and left alone.
 
 Policy (a tier is "no known failure signature fired", not "accurate"):
   filter reject                              -> reject      (the filter's reasons are kept)
@@ -16,6 +19,7 @@ not circular - but whether the two are really complementary is a hypothesis to t
 
 import csv
 import json
+import os
 import sys
 from collections import Counter
 from pathlib import Path
@@ -54,6 +58,21 @@ def decide(route, glr, v13):
     return None, "T3", False, "v13:" + ((v13 or {}).get("reject_flags") or "v1c_or_error"), False
 
 
+def sync_link(dst, src):
+    """Make `dst` a relative symlink to `src` (src None: no link). Returns None, or a reason when the link cannot be made.
+    Only symlinks are touched: a regular file at `dst` is never replaced."""
+    dst = Path(dst)
+    if dst.is_symlink():
+        if src is not None and dst.exists() and dst.resolve() == Path(src).resolve():
+            return None
+        dst.unlink()
+    elif dst.exists():
+        return "final_label_is_a_file"
+    if src is not None:
+        dst.symlink_to(os.path.relpath(src, dst.parent))
+    return None
+
+
 def main():
     out = Path(sys.argv[1])
     routes, v13s, glrs = read_csv(out / "filter" / "glr_route.csv"), read_csv(out / "results.csv"), read_csv(out / "results_glr.csv")
@@ -64,13 +83,18 @@ def main():
         src = None
         if ok:
             src = (out / "labels_glr" / f"{clip}.npz") if ann == "glr" else (out / "labels" / f"{clip}.npz")
-            dst = out / "final" / "labels" / f"{clip}.npz"
-            if src.exists() and not dst.exists():
-                dst.symlink_to(src.resolve())
-            elif not src.exists():
-                ok, why = False, why + ";label_file_missing"
+            if not src.exists():
+                ok, why, src = False, why + ";label_file_missing", None
+        dst = out / "final" / "labels" / f"{clip}.npz"
+        bad = sync_link(dst, src if ok else None)
+        if bad:
+            ok, why = False, why + ";" + bad
         rows.append({"clip": clip, "route": rt.get("route"), "accept": ok, "annotator": ann or "", "tier": tier, "fallback": fb,
                      "reason": why, "glr_v1c": (glrs.get(clip) or {}).get("v1c"), "v13_v1c": (v13s.get(clip) or {}).get("v1c")})
+    keep = {f"{r['clip']}.npz" for r in rows if r["accept"]}   # links of clips that are gone from the route table or no longer accepted
+    for p in (out / "final" / "labels").iterdir():
+        if p.is_symlink() and p.name not in keep:
+            p.unlink()
     with open(out / "final" / "results.csv", "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()) if rows else ["clip"])
         w.writeheader()
